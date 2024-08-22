@@ -1,0 +1,9 @@
+accessWidener   v2  named
+accessible field net/minecraft/client/render/GameRenderer camera Lnet/minecraft/client/render/Camera;
+mutable field net/minecraft/client/render/GameRenderer camera Lnet/minecraft/client/render/Camera;
+accessible field net/minecraft/client/render/GameRenderer renderingPanorama Z
+accessible method net/minecraft/client/render/Camera setPos (DDD)V
+accessible method net/minecraft/client/render/Camera setRotation (FF)V
+accessible field net/minecraft/client/render/BackgroundRenderer red F
+accessible field net/minecraft/client/render/BackgroundRenderer green F
+accessible field net/minecraft/client/render/BackgroundRenderer blue F

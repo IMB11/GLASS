@@ -1,0 +1,29 @@
+{
+    "schemaVersion": 1,
+    "id": "glassier",
+    "version": "${version}",
+    "name": "GLASSIER",
+    "description": "General Laymans Aesthetic Spying Screen Is Epicly Remastered",
+    "authors": [],
+    "contact": {},
+    "license": "All-Rights-Reserved",
+    "icon": "assets/glassier/icon.png",
+    "accessWidener": "glassier.accesswidener",
+    "environment": "*",
+    "entrypoints": {
+        "client": [
+            "dev.imb11.client.GlassClient"
+        ],
+        "main": [
+            "dev.imb11.Glass"
+        ]
+    },
+    "mixins": [
+        "glassier.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=${loader_version}",
+        "fabric": "*",
+        "minecraft": "${minecraft_version}"
+    }
+}
