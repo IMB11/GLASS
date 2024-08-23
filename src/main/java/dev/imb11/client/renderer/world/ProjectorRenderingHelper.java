@@ -1,4 +1,4 @@
-package dev.imb11.client.renderer;
+package dev.imb11.client.renderer.world;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
@@ -6,7 +6,6 @@ import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
 public class ProjectorRenderingHelper {

@@ -1,7 +1,7 @@
 package dev.imb11.mixins;
 
-import dev.imb11.client.renderer.IdentifiableCamera;
-import dev.imb11.client.renderer.ProjectorRenderingHelper;
+import dev.imb11.client.renderer.world.IdentifiableCamera;
+import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
 import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
 import net.minecraft.world.BlockView;

@@ -1,13 +1,12 @@
 package dev.imb11.mixins;
 
-import dev.imb11.client.renderer.IdentifiableCamera;
-import dev.imb11.client.renderer.ProjectorRenderingHelper;
-import dev.imb11.client.renderer.TemporaryCameraHelper;
+import dev.imb11.client.renderer.world.IdentifiableCamera;
+import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
+import dev.imb11.client.renderer.world.TemporaryCameraHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

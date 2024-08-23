@@ -25,6 +25,10 @@ repositories {
         name = 'Ladysnake'
         url = 'https://maven.ladysnake.org/releases'
     }
+    maven {
+        name = "CottonMC"
+        url = "https://server.bbkr.space/artifactory/libs-release"
+    }
 }
 
 loom {
@@ -39,6 +43,8 @@ dependencies {
 
     // Fabric API. This is technically optional, but you probably want it anyway.
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    modImplementation include("io.github.cottonmc:LibGui:${project.libgui_version}")
 }
 
 processResources {
