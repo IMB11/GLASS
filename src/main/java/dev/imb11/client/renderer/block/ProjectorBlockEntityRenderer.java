@@ -123,7 +123,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         matrices.pop();
 
         matrices.push();
-        ProjectorRenderingHelper.renderWorldFramebuffer(entity.getPos().add(15, 5, 15), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        ProjectorRenderingHelper.renderWorldFramebuffer(new BlockPos(20, -58, 4), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
     }
 }

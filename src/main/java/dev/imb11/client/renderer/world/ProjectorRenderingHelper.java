@@ -9,6 +9,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.apache.commons.lang3.Validate;
 import org.joml.Matrix4f;
 import qouteall.imm_ptl.core.CHelper;
@@ -21,6 +22,7 @@ import qouteall.imm_ptl.core.render.MyGameRenderer;
 import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
+import qouteall.q_misc_util.my_util.DQuaternion;
 
 import java.util.ArrayList;
 
@@ -137,24 +139,25 @@ public class ProjectorRenderingHelper {
         Matrix4f cameraTransformation = new Matrix4f();
         cameraTransformation.identity();
 
-        // Rotate in the direction of the projector block facing
         switch (direction) {
-            case UP:
+            case UP: // Camera facing down
                 cameraTransformation.rotateX((float) Math.toRadians(90));
-                break;
-            case DOWN:
-                cameraTransformation.rotateX((float) Math.toRadians(-90));
-                break;
-            case NORTH:
                 cameraTransformation.rotateY((float) Math.toRadians(180));
                 break;
-            case SOUTH:
+            case DOWN: // Camera facing up
+                cameraTransformation.rotateX((float) Math.toRadians(-90));
+                break;
+            case NORTH: // Camera facing south
+                cameraTransformation.rotateX((float) Math.toRadians(180));
+                cameraTransformation.rotateZ((float) Math.toRadians(-90));
+                break;
+            case EAST: // Camera facing west
+                cameraTransformation.rotateX((float) Math.toRadians(-90));
+                cameraTransformation.rotateZ((float) Math.toRadians(-90));
                 break;
             case WEST:
                 cameraTransformation.rotateY((float) Math.toRadians(90));
-                break;
-            case EAST:
-                cameraTransformation.rotateY((float) Math.toRadians(-90));
+//                cameraTransformation.rotateZ((float) Math.toRadians(-90));
                 break;
         }
 
