@@ -133,11 +133,10 @@ public class ProjectorRenderingHelper {
 
     // For now, to test, render world framebuffer to projector block face instead of across all the faces.
     public static void renderWorldFramebuffer(BlockPos cameraPosition, Framebuffer framebuffer, MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
-        // Render framebuffer to projector block face, nothing else.
-
         var client = MinecraftClient.getInstance();
         Matrix4f cameraTransformation = new Matrix4f();
         cameraTransformation.identity();
+
         // Rotate in the direction of the projector block facing
         switch (direction) {
             case UP:
@@ -177,62 +176,87 @@ public class ProjectorRenderingHelper {
         try {
             GuiPortalRendering.submitNextFrameRendering(worldRenderInfo, framebuffer);
         } catch (IllegalArgumentException ignored) {
-
         }
 
-        var positionMatrix = matrices.peek().getPositionMatrix();
-        BufferBuilder backgroundBuffer = Tessellator.getInstance().getBuffer();
-        backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-
-        switch (direction) {
-            case UP:
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(0, 1).next();
+        BlockPos rootPos = null;
+        for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
+            if (pair.getRight() == 0) {
+                rootPos = pair.getLeft();
                 break;
-            case DOWN:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 1).next();
-                break;
-            case NORTH:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 1).next();
-                break;
-            case SOUTH:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(0, 1).next();
-                break;
-            case WEST:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 1).next();
-                break;
-            case EAST:
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 0).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
-                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1).texture(0, 1).next();
-                break;
+            }
         }
 
-        RenderSystem.enableBlend();
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShaderTexture(0, framebuffer.getColorAttachment());
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableCull();
-        Tessellator.getInstance().draw();
-        RenderSystem.disableDepthTest();
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
+        if (rootPos == null) {
+            return; // No root position found, exit the function
+        }
+
+        for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
+            BlockPos blockPos = pair.getLeft();
+            int distance = pair.getRight();
+
+            if (distance <= targetDistance) {
+                BlockPos relativePos = blockPos.subtract(rootPos);
+
+                matrices.push();
+                matrices.translate(relativePos.getX(), relativePos.getY(), relativePos.getZ());
+
+                var positionMatrix = matrices.peek().getPositionMatrix();
+                BufferBuilder backgroundBuffer = Tessellator.getInstance().getBuffer();
+                backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+
+                switch (direction) {
+                    case UP:
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(0, 1).next();
+                        break;
+                    case DOWN:
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 1).next();
+                        break;
+                    case NORTH:
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 1).next();
+                        break;
+                    case SOUTH:
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(0, 1).next();
+                        break;
+                    case WEST:
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 1).next();
+                        break;
+                    case EAST:
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 0).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1).texture(0, 1).next();
+                        break;
+                }
+
+                RenderSystem.enableBlend();
+                RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+                RenderSystem.defaultBlendFunc();
+                RenderSystem.setShaderTexture(0, framebuffer.getColorAttachment());
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                RenderSystem.enableDepthTest();
+                RenderSystem.disableCull();
+                Tessellator.getInstance().draw();
+                RenderSystem.disableDepthTest();
+                RenderSystem.enableCull();
+                RenderSystem.disableBlend();
+
+                matrices.pop();
+            }
+        }
     }
 }
