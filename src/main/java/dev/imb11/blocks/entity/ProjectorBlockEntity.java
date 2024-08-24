@@ -21,12 +21,15 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Pair;
+import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
@@ -94,13 +97,18 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
     }
 
+    public int furthestBlock = 0;
     public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
+    private final Set<BlockPos> visitedBlocks = new HashSet<>();
 
     public void tick(World world) {
         if (active) {
             if (activeSince == -1) {
                 activeSince = System.currentTimeMillis();
                 neighbouringGlassBlocks.clear();
+                visitedBlocks.clear();
+                neighbouringGlassBlocks.add(new Pair<>(pos, 0));
+                visitedBlocks.add(pos);
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
             }
             fadeoutTime = FADEOUT_TIME_MAX;
@@ -114,21 +122,27 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
     }
 
-    private static void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, int distanceFromRoot, BlockPos currentPos, World world) {
-        if (distanceFromRoot > 10) { // Limit the recursion depth to prevent stack overflow
-            return;
-        }
-
-        // Define the directions to check based on the plane
+    private void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, int distanceFromRoot, BlockPos currentPos, World world) {
         Direction[] directionsToCheck = getDirections(plane);
+        Queue<Pair<BlockPos, Integer>> queue = new LinkedList<>();
+        queue.add(new Pair<>(currentPos, distanceFromRoot));
 
-        for (Direction direction : directionsToCheck) {
-            BlockPos neighborPos = currentPos.offset(direction);
-            if (world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
-                Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, distanceFromRoot + 1);
-                if (!map.contains(neighborPair)) {
+        while (!queue.isEmpty()) {
+            Pair<BlockPos, Integer> current = queue.poll();
+            currentPos = current.getLeft();
+            int currentDistance = current.getRight();
+
+            for (Direction direction : directionsToCheck) {
+                BlockPos neighborPos = currentPos.offset(direction);
+                if (world.getBlockState(neighborPos).getBlock() instanceof GlassBlock && visitedBlocks.add(neighborPos)) {
+                    Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
                     map.add(neighborPair);
-                    checkNeighbors(plane, map, distanceFromRoot + 1, neighborPos, world);
+                    queue.add(neighborPair);
+
+                    // Update furthestBlock accordingly
+                    if (currentDistance + 1 > furthestBlock) {
+                        furthestBlock = currentDistance + 1;
+                    }
                 }
             }
         }

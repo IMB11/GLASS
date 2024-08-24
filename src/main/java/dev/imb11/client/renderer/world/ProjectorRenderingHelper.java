@@ -15,17 +15,8 @@ import java.util.ArrayList;
 public class ProjectorRenderingHelper {
     public static boolean isRendering = false;
 
-    public static void renderBackground(MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance) {
-        Matrix4f positionMatrix = matrices.peek().getPositionMatrix();
-        Tessellator tessellator = Tessellator.getInstance();
-
+    public static void renderBackground(float r, float g, float b, MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
         // Draw a full screen white quad to prevent behind the block showing through
-        float backgroundR = BackgroundRenderer.red;
-        float backgroundG = BackgroundRenderer.green;
-        float backgroundB = BackgroundRenderer.blue;
-
-        BufferBuilder backgroundBuffer = tessellator.getBuffer();
-        backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
         // Get the root BlockPos
         BlockPos rootPos = null;
@@ -48,53 +39,84 @@ public class ProjectorRenderingHelper {
             if (distance <= targetDistance) {
                 BlockPos relativePos = blockPos.subtract(rootPos);
 
+                // Push matrix to manipulate position
+                matrices.push();
+                matrices.translate(relativePos.getX(), relativePos.getY(), relativePos.getZ());
+
+                Matrix4f positionMatrix = matrices.peek().getPositionMatrix();
+                Tessellator tessellator = Tessellator.getInstance();
+                BufferBuilder backgroundBuffer = tessellator.getBuffer();
+                backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+
+                // Check if block is within 3 of the target distance.
+                float oldR = r;
+                float oldG = g;
+                float oldB = b;
+                if (distance >= targetDistance - 3) {
+                    // Lerp between white and provided color depending on distance to target
+                    float lerp = (float) (targetDistance - distance) / 3f;
+                    r = r * lerp + (1 - lerp);
+                    g = g * lerp + (1 - lerp);
+                    b = b * lerp + (1 - lerp);
+                }
+
+
                 switch (direction) {
                     case UP:
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).color(r, g, b, 1f).next();
                         break;
                     case DOWN:
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 0, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 0, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 0, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 0, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).color(r, g, b, 1f).next();
                         break;
                     case NORTH:
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY(), 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY() + 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY() + 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY(), 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).color(r, g, b, 1f).next();
                         break;
                     case SOUTH:
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY(), 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY(), 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY() + 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY() + 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).color(r, g, b, 1f).next();
                         break;
                     case WEST:
-                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY(), relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY(), relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY() + 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY() + 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).color(r, g, b, 1f).next();
                         break;
                     case EAST:
-                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY(), relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY() + 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY() + 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY(), relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).color(r, g, b, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1).color(r, g, b, 1f).next();
                         break;
                 }
+
+                r = oldR;
+                g = oldG;
+                b = oldB;
+
+                RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                RenderSystem.enableDepthTest();
+                RenderSystem.disableCull();
+                tessellator.draw();
+                RenderSystem.disableDepthTest();
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                RenderSystem.enableCull();
+
+                // Pop matrix to restore original state
+                matrices.pop();
             }
         }
-
-
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        RenderSystem.disableCull();
-        BufferRenderer.draw(backgroundBuffer.end());
-        RenderSystem.enableCull();
     }
 
     public static void captureWorld(BlockPos cameraPosition, Framebuffer framebuffer, MinecraftClient client) {
@@ -120,7 +142,6 @@ public class ProjectorRenderingHelper {
         isRendering = false;
 
         client.gameRenderer.setBlockOutlineEnabled(true);
-
 
         RenderSystem.setProjectionMatrix(old, RenderSystem.getVertexSorting());
         client.gameRenderer.renderingPanorama = false;
