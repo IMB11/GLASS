@@ -3,15 +3,13 @@ package dev.imb11.client.gui;
 import dev.imb11.Glass;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
-import dev.imb11.sync.GLASSPackets;
+import dev.imb11.sync.GPackets;
 import io.github.cottonmc.cotton.gui.SyncedGuiDescription;
 import io.github.cottonmc.cotton.gui.widget.*;
 import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.screenhandler.v1.ScreenHandlerRegistry;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
@@ -22,8 +20,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -68,7 +64,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         }
 
         if(channels.size() == 0) {
-            ClientPlayNetworking.send(GLASSPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
+            ClientPlayNetworking.send(GPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
 
             channels.add(new Channel("Default", null));
         }
@@ -89,7 +85,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 buf.writeBlockPos(pos);
                 buf.writeString(btn.getLabel().getString());
 
-                ClientPlayNetworking.send(GLASSPackets.TERMINAL_CHANNEL_CHANGED.ID, buf);
+                ClientPlayNetworking.send(GPackets.TERMINAL_CHANNEL_CHANGED.ID, buf);
 
                 for (WButton channelButton : channelButtons) {
                     if(!channelButton.isEnabled()) {
@@ -136,7 +132,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
             buf.writeBlockPos(pos);
             buf.writeString("");
 
-            ClientPlayNetworking.send(GLASSPackets.REMOVE_LINKED_CHANNEL.ID, buf);
+            ClientPlayNetworking.send(GPackets.REMOVE_LINKED_CHANNEL.ID, buf);
 
             for (WButton channelButton : channelButtons) {
                 if(!channelButton.isEnabled()) {
@@ -188,7 +184,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
                 channels.add(new Channel(channelNameBoxValue.get(), null));
 
-                ClientPlayNetworking.send(GLASSPackets.CREATE_CHANNEL.ID, PacketByteBufs.create().writeString(channelNameBoxValue.get()));
+                ClientPlayNetworking.send(GPackets.CREATE_CHANNEL.ID, PacketByteBufs.create().writeString(channelNameBoxValue.get()));
 
                 channelList.layout();
                 channelNameBoxValue.set("");
@@ -222,7 +218,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
             } else {
                 for (Channel channel : channels) {
                     if(Objects.equals(channel.name(), val)) {
-                        ClientPlayNetworking.send(GLASSPackets.DELETE_CHANNEL.ID, PacketByteBufs.create().writeString(channel.name()));
+                        ClientPlayNetworking.send(GPackets.DELETE_CHANNEL.ID, PacketByteBufs.create().writeString(channel.name()));
                         channels.remove(channel);
                         channelList.layout();
                         removeChannel.setLabel(Text.literal("Removed!").formatted(Formatting.GREEN));

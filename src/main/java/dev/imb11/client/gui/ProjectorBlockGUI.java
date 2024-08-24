@@ -2,7 +2,7 @@ package dev.imb11.client.gui;
 
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
-import dev.imb11.sync.GLASSPackets;
+import dev.imb11.sync.GPackets;
 import io.github.cottonmc.cotton.gui.SyncedGuiDescription;
 import io.github.cottonmc.cotton.gui.widget.WButton;
 import io.github.cottonmc.cotton.gui.widget.WListPanel;
@@ -58,7 +58,7 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         }
 
         if(channels.size() == 0) {
-            ClientPlayNetworking.send(GLASSPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
+            ClientPlayNetworking.send(GPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
 
             channels.add(new Channel("Default", null));
         }
@@ -74,7 +74,7 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
 
                 selectedChannel.set(btn.getLabel().getString());
 
-                ClientPlayNetworking.send(GLASSPackets.PROJECTOR_CHANNEL_CHANGED.ID, bufe);
+                ClientPlayNetworking.send(GPackets.PROJECTOR_CHANNEL_CHANGED.ID, bufe);
 
                 for (WButton channelButton : channelButtons) {
                     if(!channelButton.isEnabled()) {

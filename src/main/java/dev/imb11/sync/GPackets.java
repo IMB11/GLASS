@@ -19,26 +19,32 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
-public enum GLASSPackets {
-    TERMINAL_CHANNEL_CHANGED(null, GLASSPackets::onTerminalChannelChanged, null),
-    REMOVE_LINKED_CHANNEL(null, GLASSPackets::onRemoveLinkedChannel, null),
-    POPULATE_DEFAULT_CHANNEL(null, GLASSPackets::onPopulateDefaultChannel, null),
+public enum GPackets {
+    TERMINAL_CHANNEL_CHANGED(null, GPackets::onTerminalChannelChanged, null),
+    REMOVE_LINKED_CHANNEL(null, GPackets::onRemoveLinkedChannel, null),
+    POPULATE_DEFAULT_CHANNEL(null, GPackets::onPopulateDefaultChannel, null),
 
-    DELETE_CHANNEL(null, GLASSPackets::onDeleteChannel, null),
-    CREATE_CHANNEL(null, GLASSPackets::onCreateChannel, null),
+    DELETE_CHANNEL(null, GPackets::onDeleteChannel, null),
+    CREATE_CHANNEL(null, GPackets::onCreateChannel, null),
 
-    PROJECTOR_CHANNEL_CHANGED(null, GLASSPackets::onProjectorChannelChanged, null);
+    PROJECTOR_CHANNEL_CHANGED(null, GPackets::onProjectorChannelChanged, null);
 
     public final Identifier ID;
     private final EnvType env;
     private final ServerPlayNetworking.PlayChannelHandler serverAction;
     private final ClientPlayNetworking.PlayChannelHandler clientAction;
 
-    GLASSPackets(@Nullable EnvType envType, @Nullable ServerPlayNetworking.PlayChannelHandler serverAction, @Nullable ClientPlayNetworking.PlayChannelHandler clientAction) {
+    GPackets(@Nullable EnvType envType, @Nullable ServerPlayNetworking.PlayChannelHandler serverAction, @Nullable ClientPlayNetworking.PlayChannelHandler clientAction) {
         this.ID = new Identifier("glass", this.name().toLowerCase());
         this.env = envType;
         this.serverAction = serverAction;
         this.clientAction = clientAction;
+    }
+
+    public static void initialize() {
+        for (GPackets packet : values()) {
+            packet.register();
+        }
     }
 
     public void register() {
