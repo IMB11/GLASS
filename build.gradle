@@ -29,6 +29,12 @@ repositories {
         name = "CottonMC"
         url = "https://server.bbkr.space/artifactory/libs-release"
     }
+    maven {
+        url 'https://jitpack.io'
+    }
+    maven {
+        url 'https://maven.shedaniel.me'
+    }
 }
 
 loom {
@@ -45,6 +51,9 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     modImplementation include("io.github.cottonmc:LibGui:${project.libgui_version}")
+
+    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:imm_ptl_core:v3.3.9-mc1.20.1")
+    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:q_misc_util:v3.3.9-mc1.20.1")
 }
 
 processResources {

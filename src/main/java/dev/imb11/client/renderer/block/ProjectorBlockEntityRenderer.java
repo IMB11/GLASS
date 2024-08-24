@@ -1,6 +1,5 @@
 package dev.imb11.client.renderer.block;
 
-import dev.imb11.Glass;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
 import net.minecraft.block.Blocks;
@@ -13,20 +12,15 @@ import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import org.joml.Quaternionf;
 
-import java.util.ArrayList;
 import java.util.Objects;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
 
     public Framebuffer framebuffer;
-    public int targetDistance = 0;
-    public long activeSince = -1;
-    public long deactiveSince = -1;
 
     public ProjectorBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {}
 
@@ -95,33 +89,41 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         int maxDistance = entity.furthestBlock + 3;
 
+        // Render the world onto the facing direction.
+        if(framebuffer == null) {
+            framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
+        }
+
         if (entity.active && entity.activeSince != -1) {
             long activeSince = entity.activeSince;
-            deactiveSince = -1;
-            if(this.activeSince == -1) {
-                this.activeSince = activeSince;
+            entity.deactiveSince = -1;
+            if(entity.activeSince == -1) {
+                entity.activeSince = activeSince;
             }
 
-            targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
+            entity.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
 
-            // Render the world onto the facing direction.
-            if(framebuffer == null) {
-                framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
-            }
+            entity.markDirty();
         } else {
-            if (this.deactiveSince == -1) {
-                this.deactiveSince = System.currentTimeMillis();
+            if (entity.deactiveSince == -1) {
+                entity.deactiveSince = System.currentTimeMillis();
+                entity.markDirty();
             }
 
             // Decrement the target distance to -1 every 25ms
-            if (targetDistance > -3 && System.currentTimeMillis() - deactiveSince > 25L) {
-                targetDistance--;
-                deactiveSince = System.currentTimeMillis();
+            if (entity.targetDistance > -3 && System.currentTimeMillis() - entity.deactiveSince > 25L) {
+                entity.targetDistance--;
+                entity.deactiveSince = System.currentTimeMillis();
+                entity.markDirty();
             }
         }
 
         matrices.push();
-        ProjectorRenderingHelper.renderBackground(r, g, b, matrices, facing, entity.neighbouringGlassBlocks, targetDistance, maxDistance);
+        ProjectorRenderingHelper.renderBackground(r, g, b, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        matrices.pop();
+
+        matrices.push();
+        ProjectorRenderingHelper.renderWorldFramebuffer(entity.getPos().add(15, 5, 15), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
     }
 }

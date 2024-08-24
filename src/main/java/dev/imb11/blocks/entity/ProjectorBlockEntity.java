@@ -7,11 +7,8 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.Blocks;
 import net.minecraft.block.GlassBlock;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -21,15 +18,12 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Pair;
-import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
@@ -40,6 +34,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     public long activeSince = -1;
     public String channel = "";
     public Direction facing = Direction.UP;
+
+    // Rendering variables
+    public int targetDistance = 0;
+    public long deactiveSince = -1;
 
     public float rotationBeacon, rotationBeaconPrev;
 
@@ -55,6 +53,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         tag.putString("channel", channel);
         tag.putBoolean("active", active);
         tag.putInt("fadeoutTime", fadeoutTime);
+        tag.putLong("activeSince", activeSince);
+        tag.putLong("deactiveSince", deactiveSince);
+        tag.putInt("targetDistance", targetDistance);
+
         super.writeNbt(tag);
     }
 
@@ -66,6 +68,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
         active = tag.getBoolean("active");
         fadeoutTime = tag.getInt("fadeoutTime");
+        activeSince = tag.getLong("activeSince");
+        deactiveSince = tag.getLong("deactiveSince");
+        targetDistance = tag.getInt("targetDistance");
 
         super.readNbt(tag);
     }
@@ -77,9 +82,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-
         PacketByteBuf buf = PacketByteBufs.create();
-
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
 
         buf.writeString(channel);

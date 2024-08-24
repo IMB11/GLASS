@@ -1,5 +1,6 @@
 package dev.imb11.client.renderer.world;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
@@ -8,7 +9,18 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import org.apache.commons.lang3.Validate;
 import org.joml.Matrix4f;
+import qouteall.imm_ptl.core.CHelper;
+import qouteall.imm_ptl.core.ClientWorldLoader;
+import qouteall.imm_ptl.core.IPCGlobal;
+import qouteall.imm_ptl.core.ducks.IECamera;
+import qouteall.imm_ptl.core.ducks.IEMinecraftClient;
+import qouteall.imm_ptl.core.render.GuiPortalRendering;
+import qouteall.imm_ptl.core.render.MyGameRenderer;
+import qouteall.imm_ptl.core.render.MyRenderHelper;
+import qouteall.imm_ptl.core.render.context_management.RenderStates;
+import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 
 import java.util.ArrayList;
 
@@ -119,33 +131,108 @@ public class ProjectorRenderingHelper {
         }
     }
 
-    public static void captureWorld(BlockPos cameraPosition, Framebuffer framebuffer, MinecraftClient client) {
-        IdentifiableCamera newCamera = new IdentifiableCamera();
-        newCamera.reset();
-        Camera oldCamera = client.gameRenderer.getCamera();
-        client.gameRenderer.renderingPanorama = true;
-        client.worldRenderer.reloadTransparencyPostProcessor();
-        client.getFramebuffer().endWrite();
+    // For now, to test, render world framebuffer to projector block face instead of across all the faces.
+    public static void renderWorldFramebuffer(BlockPos cameraPosition, Framebuffer framebuffer, MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
+        // Render framebuffer to projector block face, nothing else.
 
-        Matrix4f old = new Matrix4f(RenderSystem.getProjectionMatrix());
-        framebuffer.beginWrite(true);
-        client.gameRenderer.setBlockOutlineEnabled(false);
+        var client = MinecraftClient.getInstance();
+        Matrix4f cameraTransformation = new Matrix4f();
+        cameraTransformation.identity();
+        // Rotate in the direction of the projector block facing
+        switch (direction) {
+            case UP:
+                cameraTransformation.rotateX((float) Math.toRadians(90));
+                break;
+            case DOWN:
+                cameraTransformation.rotateX((float) Math.toRadians(-90));
+                break;
+            case NORTH:
+                cameraTransformation.rotateY((float) Math.toRadians(180));
+                break;
+            case SOUTH:
+                break;
+            case WEST:
+                cameraTransformation.rotateY((float) Math.toRadians(90));
+                break;
+            case EAST:
+                cameraTransformation.rotateY((float) Math.toRadians(-90));
+                break;
+        }
 
-        isRendering = true;
-        newCamera.setPos(cameraPosition.getX(), cameraPosition.getY(), cameraPosition.getZ());
-        ((TemporaryCameraHelper) client.gameRenderer).gLASS$setOldCamera(oldCamera);
-        client.gameRenderer.camera = newCamera;
-        client.gameRenderer.renderWorld(0F, 0L, new MatrixStack());
-        client.gameRenderer.camera = oldCamera;
-        ((TemporaryCameraHelper) client.gameRenderer).gLASS$setOldCamera(null);
-        framebuffer.endWrite();
-        isRendering = false;
+        if (client.player == null) return;
 
-        client.gameRenderer.setBlockOutlineEnabled(true);
+        WorldRenderInfo worldRenderInfo = new WorldRenderInfo.Builder()
+                .setWorld(client.world)
+                .setCameraPos(cameraPosition.toCenterPos())
+                .setCameraTransformation(cameraTransformation)
+                .setOverwriteCameraTransformation(true)
+                .setDescription(null)
+                .setRenderDistance(client.options.getClampedViewDistance())
+                .setDoRenderHand(false)
+                .setEnableViewBobbing(false)
+                .setDoRenderSky(false)
+                .setHasFog(false)
+                .build();
 
-        RenderSystem.setProjectionMatrix(old, RenderSystem.getVertexSorting());
-        client.gameRenderer.renderingPanorama = false;
-        client.worldRenderer.reloadTransparencyPostProcessor();
-        client.getFramebuffer().beginWrite(true);
+        try {
+            GuiPortalRendering.submitNextFrameRendering(worldRenderInfo, framebuffer);
+        } catch (IllegalArgumentException ignored) {
+
+        }
+
+        var positionMatrix = matrices.peek().getPositionMatrix();
+        BufferBuilder backgroundBuffer = Tessellator.getInstance().getBuffer();
+        backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+
+        switch (direction) {
+            case UP:
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(0, 1).next();
+                break;
+            case DOWN:
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 1).next();
+                break;
+            case NORTH:
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 1).next();
+                break;
+            case SOUTH:
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1.01f).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(0, 1).next();
+                break;
+            case WEST:
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 0, 1.01f).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 1.01f).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 0, 1.01f, 0).texture(0, 1).next();
+                break;
+            case EAST:
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 0).texture(0, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 0).texture(1, 0).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 1.01f, 1.01f).texture(1, 1).next();
+                backgroundBuffer.vertex(positionMatrix, 1.01f, 0, 1).texture(0, 1).next();
+                break;
+        }
+
+        RenderSystem.enableBlend();
+        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderTexture(0, framebuffer.getColorAttachment());
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        RenderSystem.enableDepthTest();
+        RenderSystem.disableCull();
+        Tessellator.getInstance().draw();
+        RenderSystem.disableDepthTest();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
     }
 }
