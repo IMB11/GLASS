@@ -100,10 +100,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         if (active) {
             if (activeSince == -1) {
                 activeSince = System.currentTimeMillis();
+                neighbouringGlassBlocks.clear();
+                checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
             }
             fadeoutTime = FADEOUT_TIME_MAX;
-            neighbouringGlassBlocks.clear();
-            checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
         } else {
             activeSince = -1;
             if (fadeoutTime > 0) {

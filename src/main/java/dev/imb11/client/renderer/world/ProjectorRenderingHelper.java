@@ -27,49 +27,73 @@ public class ProjectorRenderingHelper {
         BufferBuilder backgroundBuffer = tessellator.getBuffer();
         backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
-        switch (direction) {
-            case UP:
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+        // Get the root BlockPos
+        BlockPos rootPos = null;
+        for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
+            if (pair.getRight() == 0) {
+                rootPos = pair.getLeft();
                 break;
-            case DOWN:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                break;
-            case NORTH:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                break;
-            case SOUTH:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                break;
-            case WEST:
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 0, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                break;
-            case EAST:
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                backgroundBuffer.vertex(positionMatrix, 1, 0, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
-                break;
+            }
         }
+
+        if (rootPos == null) {
+            return; // No root position found, exit the function
+        }
+
+        // Iterate over neighbouring blocks and render if within target distance
+        for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
+            BlockPos blockPos = pair.getLeft();
+            int distance = pair.getRight();
+
+            if (distance <= targetDistance) {
+                BlockPos relativePos = blockPos.subtract(rootPos);
+
+                switch (direction) {
+                    case UP:
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                    case DOWN:
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 0, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 0, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, 0, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), 0, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                    case NORTH:
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY(), 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY() + 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY() + 1, 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY(), 0).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                    case SOUTH:
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY(), 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY(), 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX() + 1, relativePos.getY() + 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, relativePos.getX(), relativePos.getY() + 1, 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                    case WEST:
+                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY(), relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY(), relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY() + 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 0, relativePos.getY() + 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                    case EAST:
+                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY(), relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY() + 1, relativePos.getZ()).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY() + 1, relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        backgroundBuffer.vertex(positionMatrix, 1, relativePos.getY(), relativePos.getZ() + 1).color(backgroundR, backgroundG, backgroundB, 1f).next();
+                        break;
+                }
+            }
+        }
+
 
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.disableCull();
-        tessellator.draw();
+        BufferRenderer.draw(backgroundBuffer.end());
         RenderSystem.enableCull();
     }
 
