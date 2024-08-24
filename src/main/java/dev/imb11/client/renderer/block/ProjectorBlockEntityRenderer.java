@@ -1,8 +1,11 @@
 package dev.imb11.client.renderer.block;
 
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
+import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.gl.SimpleFramebuffer;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -12,12 +15,18 @@ import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.Pair;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import org.joml.Quaternionf;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
+
+    public Framebuffer framebuffer;
+    public int targetDistance = 0;
 
     public ProjectorBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {}
 
@@ -77,5 +86,24 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
                 OverlayTexture.DEFAULT_UV);
 
         matrices.pop();
+
+        if (entity.active) {
+            long activeSince = entity.activeSince;
+            // Max distance is 10, every 0.25s increase the distance by 1 according to activeSince.
+            targetDistance = (int) Math.min(10, (System.currentTimeMillis() - activeSince) / 250);
+
+            // Render the world onto the facing direction.
+            Direction facing = entity.facing;
+            if(framebuffer == null) {
+                framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
+            }
+
+//        ProjectorRenderingHelper.captureWorld(entity.getPos().add(15, 15, 15), framebuffer, MinecraftClient.getInstance());
+
+            matrices.push();
+            ProjectorRenderingHelper.renderBackground(matrices, facing, entity.neighbouringGlassBlocks, targetDistance);
+            matrices.pop();
+        }
+
     }
 }

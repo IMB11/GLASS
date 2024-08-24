@@ -8,6 +8,8 @@ import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityT
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.BlockWithEntity;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.GlassBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityTicker;
 import net.minecraft.block.entity.BlockEntityType;
@@ -18,9 +20,13 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
@@ -28,6 +34,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     public int fadeoutTime = 12;
     public boolean active = false;
+    public long activeSince = -1;
     public String channel = "";
     public Direction facing = Direction.UP;
 
@@ -87,21 +94,67 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
     }
 
-    public void tick() {
+    public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
+
+    public void tick(World world) {
         if (active) {
-           fadeoutTime = FADEOUT_TIME_MAX;
+            if (activeSince == -1) {
+                activeSince = System.currentTimeMillis();
+            }
+            fadeoutTime = FADEOUT_TIME_MAX;
+            neighbouringGlassBlocks.clear();
+            checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
         } else {
-            fadeoutTime--;
+            activeSince = -1;
+            if (fadeoutTime > 0) {
+                fadeoutTime--;
+            } else {
+                fadeoutTime = 0;
+            }
         }
     }
 
-    public static void tick(World world1, BlockPos pos, BlockState state1, ProjectorBlockEntity be) {
-        be.tick();
-        be.active = world1.isReceivingRedstonePower(pos);
+    private static void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, int distanceFromRoot, BlockPos currentPos, World world) {
+        if (distanceFromRoot > 10) { // Limit the recursion depth to prevent stack overflow
+            return;
+        }
 
-        float rotationFactor = !be.active ? (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX)) : ((float) be.fadeoutTime / FADEOUT_TIME_MAX);
+        // Define the directions to check based on the plane
+        Direction[] directionsToCheck = getDirections(plane);
 
-        be.rotationBeacon += 20F * rotationFactor;
+        for (Direction direction : directionsToCheck) {
+            BlockPos neighborPos = currentPos.offset(direction);
+            if (world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
+                Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, distanceFromRoot + 1);
+                if (!map.contains(neighborPair)) {
+                    map.add(neighborPair);
+                    checkNeighbors(plane, map, distanceFromRoot + 1, neighborPos, world);
+                }
+            }
+        }
+    }
+
+    private static Direction @NotNull [] getDirections(Direction plane) {
+        Direction[] directionsToCheck;
+        if (plane == Direction.UP || plane == Direction.DOWN) {
+            directionsToCheck = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
+        } else if (plane == Direction.NORTH || plane == Direction.SOUTH) {
+            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.EAST, Direction.WEST};
+        } else {
+            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH};
+        }
+        return directionsToCheck;
+    }
+
+    public static void tick(World world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
+        be.tick(world);
+        be.active = world.isReceivingRedstonePower(pos);
+
+        float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
+
+        if (rotationFactor > 0) {
+            be.rotationBeacon += 20F * rotationFactor;
+        }
         be.rotationBeaconPrev = be.rotationBeacon;
     }
 }
