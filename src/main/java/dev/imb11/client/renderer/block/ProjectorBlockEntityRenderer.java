@@ -119,11 +119,11 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         }
 
         matrices.push();
-        ProjectorRenderingHelper.renderBackground(r, g, b, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+//        ProjectorRenderingHelper.renderBackground(r, g, b, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
 
-        matrices.push();
-        ProjectorRenderingHelper.renderWorldFramebuffer(new BlockPos(20, -58, 4), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
-        matrices.pop();
+//        matrices.push();
+//        ProjectorRenderingHelper.renderWorldFramebuffer(new BlockPos(20, -58, 4), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+//        matrices.pop();
     }
 }

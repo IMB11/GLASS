@@ -10,18 +10,24 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.GlassBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
+import qouteall.imm_ptl.core.portal.GeometryPortalShape;
+import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.q_misc_util.my_util.DQuaternion;
 
 import java.util.*;
 
@@ -58,6 +64,54 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         tag.putInt("targetDistance", targetDistance);
 
         super.writeNbt(tag);
+    }
+
+    private Portal portal = null;
+    public void createPortal(ServerWorld world) {
+        var portalTriangles = new GeometryPortalShape();
+
+        BlockPos rootPos = this.getPos();
+
+
+        int halfWidth = actualWidth / 2;
+        int halfHeight = actualHeight / 2;
+
+        // A map of blockpos and distance from rootPos
+        for (Pair<BlockPos, Integer> neighbouringGlassBlock : this.neighbouringGlassBlocks) {
+            BlockPos relativePos = neighbouringGlassBlock.getLeft().subtract(rootPos);
+
+            int x1 = relativePos.getX();
+            int y1 = relativePos.getY();
+            int x2 = x1 + 1;
+            int y2 = y1 + 1;
+
+            // Normalize to range [-1, 1]
+            double normalizedX1 = (double) (x1 - halfWidth) / halfWidth;
+            double normalizedY1 = (double) (y1 - halfHeight) / halfHeight;
+            double normalizedX2 = (double) (x2 - halfWidth) / halfWidth;
+            double normalizedY2 = (double) (y2 - halfHeight) / halfHeight;
+
+            portalTriangles.addTriangleForRectangle(normalizedX1, normalizedY1, normalizedX2, normalizedY2);
+        }
+
+        Vec3d facePos = rootPos.toCenterPos();
+
+        facePos.add(new Vec3d(0.51, 0.51, 0.51).multiply(Vec3d.of(facing.getVector())));
+
+        this.portal = Portal.entityType.create(world);
+        portal.setOriginPos(facePos);
+        portal.setDestinationDimension(World.OVERWORLD);
+        portal.setDestination(new Vec3d(0, 70, 0));
+        portal.setInteractable(false);
+        portal.setTeleportable(false);
+        portal.setOrientationAndSize(
+                new Vec3d(0, 1, 0), // axisW
+                new Vec3d(0, 0, 1), // axisH
+                furthestBlock,
+                furthestBlock
+        );
+
+        portal.getWorld().spawnEntity(portal);
     }
 
     @Override
@@ -113,10 +167,20 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 neighbouringGlassBlocks.add(new Pair<>(pos, 0));
                 visitedBlocks.add(pos);
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
+
+                if(!world.isClient) {
+                    createPortal((ServerWorld) world);
+                }
             }
             fadeoutTime = FADEOUT_TIME_MAX;
         } else {
             activeSince = -1;
+
+            if (portal != null && !world.isClient) {
+                portal.remove(Entity.RemovalReason.DISCARDED);
+                portal = null;
+            }
+
             if (fadeoutTime > 0) {
                 fadeoutTime--;
             } else {
@@ -165,10 +229,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     public static void tick(World world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
         be.tick(world);
+
         be.active = world.isReceivingRedstonePower(pos);
-
         float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
-
         if (rotationFactor > 0) {
             be.rotationBeacon += 20F * rotationFactor;
         }
