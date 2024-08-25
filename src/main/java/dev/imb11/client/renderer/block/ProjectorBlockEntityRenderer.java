@@ -81,10 +81,6 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         matrices.pop();
 
-        float r = BackgroundRenderer.red;
-        float g = BackgroundRenderer.green;
-        float b = BackgroundRenderer.blue;
-
         Direction facing = entity.facing;
 
         int maxDistance = entity.furthestBlock + 3;
@@ -94,32 +90,8 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
             framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
         }
 
-        if (entity.active && entity.activeSince != -1) {
-            long activeSince = entity.activeSince;
-            entity.deactiveSince = -1;
-            if(entity.activeSince == -1) {
-                entity.activeSince = activeSince;
-            }
-
-            entity.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
-
-            entity.markDirty();
-        } else {
-            if (entity.deactiveSince == -1) {
-                entity.deactiveSince = System.currentTimeMillis();
-                entity.markDirty();
-            }
-
-            // Decrement the target distance to -1 every 25ms
-            if (entity.targetDistance > -3 && System.currentTimeMillis() - entity.deactiveSince > 25L) {
-                entity.targetDistance--;
-                entity.deactiveSince = System.currentTimeMillis();
-                entity.markDirty();
-            }
-        }
-
         matrices.push();
-//        ProjectorRenderingHelper.renderBackground(r, g, b, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        ProjectorRenderingHelper.renderEdgePanels(matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
 
 //        matrices.push();

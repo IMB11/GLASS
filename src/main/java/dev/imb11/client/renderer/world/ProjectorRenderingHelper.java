@@ -29,7 +29,7 @@ import java.util.ArrayList;
 public class ProjectorRenderingHelper {
     public static boolean isRendering = false;
 
-    public static void renderBackground(float r, float g, float b, MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
+    public static void renderEdgePanels(MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
         // Draw a full screen white quad to prevent behind the block showing through
 
         // Get the root BlockPos
@@ -45,13 +45,23 @@ public class ProjectorRenderingHelper {
             return; // No root position found, exit the function
         }
 
+        float r = 1f, g = 1f, b = 1f;
+
         // Iterate over neighbouring blocks and render if within target distance
         for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
             BlockPos blockPos = pair.getLeft();
             int distance = pair.getRight();
 
-            if (distance <= targetDistance) {
+            if (distance >= targetDistance - 2 && distance <= targetDistance) {
                 BlockPos relativePos = blockPos.subtract(rootPos);
+
+                float oldR = r;
+                float oldG = g;
+                float oldB = b;
+                float lerp = (float) (targetDistance - distance) / 3f;
+                r = r * (1 - lerp);
+                g = g * (1 - lerp);
+                b = b * (1 - lerp);
 
                 // Push matrix to manipulate position
                 matrices.push();
@@ -61,19 +71,6 @@ public class ProjectorRenderingHelper {
                 Tessellator tessellator = Tessellator.getInstance();
                 BufferBuilder backgroundBuffer = tessellator.getBuffer();
                 backgroundBuffer.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-
-                // Check if block is within 3 of the target distance.
-                float oldR = r;
-                float oldG = g;
-                float oldB = b;
-                if (distance >= targetDistance - 3) {
-                    // Lerp between white and provided color depending on distance to target
-                    float lerp = (float) (targetDistance - distance) / 3f;
-                    r = r * lerp + (1 - lerp);
-                    g = g * lerp + (1 - lerp);
-                    b = b * lerp + (1 - lerp);
-                }
-
 
                 switch (direction) {
                     case UP:
@@ -119,7 +116,7 @@ public class ProjectorRenderingHelper {
                 b = oldB;
 
                 RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                RenderSystem.setShaderColor(1f, 1f, 1f, lerp);
                 RenderSystem.enableDepthTest();
                 RenderSystem.disableCull();
                 tessellator.draw();

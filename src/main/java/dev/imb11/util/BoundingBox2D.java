@@ -42,6 +42,9 @@ public class BoundingBox2D {
             }
         }
 
+        // Add rootPos to the portal
+        portal.specialShape.addTriangleForRectangle(0, 0, 1, 1);
+
         portal.specialShape.normalize(this.getWidth(), this.getHeight());
     }
 

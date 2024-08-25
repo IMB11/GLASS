@@ -34,24 +34,72 @@ import qouteall.q_misc_util.my_util.DQuaternion;
 import java.util.*;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
-    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
-    public static int FADEOUT_TIME_MAX = 12;
-
+    public static int FADEOUT_TIME_MAX = 12;    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
+    public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
+    private final Set<BlockPos> visitedBlocks = new HashSet<>();
     public int fadeoutTime = 12;
     public boolean active = false;
     public long activeSince = -1;
     public String channel = "";
     public Direction facing = Direction.UP;
-
     // Rendering variables
     public int targetDistance = 0;
     public long deactiveSince = -1;
-
     public float rotationBeacon, rotationBeaconPrev;
+    public int furthestBlock = 0;
     private BoundingBox2D boundingBox;
+    private Portal portal = null;
 
     public ProjectorBlockEntity(BlockPos pos, BlockState state) {
         super(BLOCK_ENTITY_TYPE, pos, state);
+    }
+
+    private static Direction @NotNull [] getDirections(Direction plane) {
+        Direction[] directionsToCheck;
+        if (plane == Direction.UP || plane == Direction.DOWN) {
+            directionsToCheck = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
+        } else if (plane == Direction.NORTH || plane == Direction.SOUTH) {
+            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.EAST, Direction.WEST};
+        } else {
+            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH};
+        }
+        return directionsToCheck;
+    }
+
+    public static void tick(World world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
+        be.tick(world);
+
+        be.active = world.isReceivingRedstonePower(pos);
+        float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
+        if (rotationFactor > 0) {
+            be.rotationBeacon += 20F * rotationFactor;
+        }
+        be.rotationBeaconPrev = be.rotationBeacon;
+
+
+        if (be.active && be.activeSince != -1) {
+            long activeSince = be.activeSince;
+            be.deactiveSince = -1;
+            if (be.activeSince == -1) {
+                be.activeSince = activeSince;
+            }
+
+            int maxDistance = be.furthestBlock + 3;
+            be.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
+            be.markDirty();
+        } else {
+            if (be.deactiveSince == -1) {
+                be.deactiveSince = System.currentTimeMillis();
+                be.markDirty();
+            }
+
+            // Decrement the target distance to -1 every 25ms
+            if (be.targetDistance > -3 && System.currentTimeMillis() - be.deactiveSince > 25L) {
+                be.targetDistance--;
+                be.deactiveSince = System.currentTimeMillis();
+                be.markDirty();
+            }
+        }
     }
 
     @Override
@@ -69,7 +117,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         super.writeNbt(tag);
     }
 
-    private Portal portal = null;
     public void createPortal(ServerWorld world, int targetDistance) {
         this.boundingBox = null;
 
@@ -146,8 +193,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             case NORTH, SOUTH:
                 // Adjust facepos accordingly
                 Vec3d facePos = boundingBox.getMidpoint();
+
+                // TODO: FX look at this, how do I properly center the portal? This only works for one use-case of the portal.
                 facePos = facePos.add(new Vec3d(0.5D, 0.5D, 0.5D).multiply(BoundingBox2D.getRelativeUpVector(facing)));
                 facePos = facePos.add(new Vec3d(0.5D, 0, facing == Direction.SOUTH ? 1.0D : 0.0D));
+                facePos = facePos.add(2, 0, 0);
                 facePos = facePos.add(new Vec3d(0.005D, 0.005D, 0.005D).multiply(Vec3d.of(facing.getVector())));
 
                 // Rotate 180 to face the opposite direction
@@ -156,7 +206,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
 
         portal.specialShape = new GeometryPortalShape();
-        boundingBox.addSquares(this.getPos(), portal, 8);
+        boundingBox.addSquares(this.getPos(), portal, targetDistance);
 
         portal.getWorld().spawnEntity(portal);
 
@@ -203,10 +253,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
     }
 
-    public int furthestBlock = 0;
-    public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
-    private final Set<BlockPos> visitedBlocks = new HashSet<>();
-
     public void tick(World world) {
         if (active) {
             if (activeSince == -1) {
@@ -217,30 +263,30 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 visitedBlocks.add(pos);
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
 
-                if(!world.isClient) {
+                if (!world.isClient) {
                     createPortal((ServerWorld) world, targetDistance);
                 }
-            }
-
-            if (this.boundingBox != null && this.portal != null) {
-//                boundingBox.addSquares(this.getPos(), portal, 8);
-//                portal.reloadAndSyncToClient();
             }
 
             fadeoutTime = FADEOUT_TIME_MAX;
         } else {
             activeSince = -1;
 
-            if (portal != null && !world.isClient) {
-                portal.remove(Entity.RemovalReason.DISCARDED);
-                portal = null;
-            }
-
             if (fadeoutTime > 0) {
                 fadeoutTime--;
             } else {
                 fadeoutTime = 0;
+
+                if (portal != null && !world.isClient) {
+                    portal.remove(Entity.RemovalReason.DISCARDED);
+                    portal = null;
+                }
             }
+        }
+
+        if (this.boundingBox != null && this.portal != null) {
+            boundingBox.addSquares(this.getPos(), portal, targetDistance);
+            portal.reloadAndSyncToClient();
         }
     }
 
@@ -273,26 +319,5 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
     }
 
-    private static Direction @NotNull [] getDirections(Direction plane) {
-        Direction[] directionsToCheck;
-        if (plane == Direction.UP || plane == Direction.DOWN) {
-            directionsToCheck = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-        } else if (plane == Direction.NORTH || plane == Direction.SOUTH) {
-            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.EAST, Direction.WEST};
-        } else {
-            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH};
-        }
-        return directionsToCheck;
-    }
 
-    public static void tick(World world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
-        be.tick(world);
-
-        be.active = world.isReceivingRedstonePower(pos);
-        float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
-        if (rotationFactor > 0) {
-            be.rotationBeacon += 20F * rotationFactor;
-        }
-        be.rotationBeaconPrev = be.rotationBeacon;
-    }
 }
