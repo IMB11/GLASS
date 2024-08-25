@@ -73,6 +73,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         BlockPos rootPos = this.getPos();
 
 
+        int actualWidth = furthestBlock * 2;
+        int actualHeight = furthestBlock * 2;
         int halfWidth = actualWidth / 2;
         int halfHeight = actualHeight / 2;
 
@@ -107,9 +109,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         portal.setOrientationAndSize(
                 new Vec3d(0, 1, 0), // axisW
                 new Vec3d(0, 0, 1), // axisH
-                furthestBlock,
-                furthestBlock
+                actualWidth,
+                actualHeight
         );
+
+        portal.specialShape = portalTriangles;
 
         portal.getWorld().spawnEntity(portal);
     }
