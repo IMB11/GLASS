@@ -1,5 +1,6 @@
 package dev.imb11.blocks.entity;
 
+import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.sync.ChannelManagerPersistence;
@@ -72,33 +73,55 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
         BlockPos rootPos = this.getPos();
 
+        // Initialize with extreme values for bounding box calculation
+        int minX = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
 
-        int actualWidth = furthestBlock * 2;
-        int actualHeight = furthestBlock * 2;
-        int halfWidth = actualWidth / 2;
-        int halfHeight = actualHeight / 2;
+// Traverse the list of positions to determine the bounding box
+        for (Pair<BlockPos, Integer> pair : this.neighbouringGlassBlocks) {
+            BlockPos pos = pair.getLeft();
 
-        // A map of blockpos and distance from rootPos
-        for (Pair<BlockPos, Integer> neighbouringGlassBlock : this.neighbouringGlassBlocks) {
-            BlockPos relativePos = neighbouringGlassBlock.getLeft().subtract(rootPos);
-
-            int x1 = relativePos.getX();
-            int y1 = relativePos.getY();
-            int x2 = x1 + 1;
-            int y2 = y1 + 1;
-
-            // Normalize to range [-1, 1]
-            double normalizedX1 = (double) (x1 - halfWidth) / halfWidth;
-            double normalizedY1 = (double) (y1 - halfHeight) / halfHeight;
-            double normalizedX2 = (double) (x2 - halfWidth) / halfWidth;
-            double normalizedY2 = (double) (y2 - halfHeight) / halfHeight;
-
-            portalTriangles.addTriangleForRectangle(normalizedX1, normalizedY1, normalizedX2, normalizedY2);
+            // Update min and max x and z
+            if (pos.getX() < minX) minX = pos.getX();
+            if (pos.getZ() < minZ) minZ = pos.getZ();
+            if (pos.getX() > maxX) maxX = pos.getX();
+            if (pos.getZ() > maxZ) maxZ = pos.getZ();
         }
 
-        Vec3d facePos = rootPos.toCenterPos();
+// Step 1: Calculate the center of the bounding box
+        int centerX = (minX + maxX) / 2;
+        int centerZ = (minZ + maxZ) / 2;
 
-        facePos.add(new Vec3d(0.51, 0.51, 0.51).multiply(Vec3d.of(facing.getVector())));
+// Step 2: Determine the maximum half-dimension (to normalize to a square)
+        int halfWidth = Math.max((maxX - minX) / 2, 1);
+        int halfDepth = Math.max((maxZ - minZ) / 2, 1);
+        int maxHalfDimension = Math.max(halfWidth, halfDepth);
+
+// Step 3: Normalize each position
+        List<Pair<Double, Double>> normalizedPositions = new ArrayList<>();
+
+        for (Pair<BlockPos, Integer> pair : this.neighbouringGlassBlocks) {
+            BlockPos pos = pair.getLeft();
+
+            // Translate the position to the center of the bounding box
+            int translatedX = pos.getX() - centerX;
+            int translatedZ = pos.getZ() - centerZ;
+
+            // Scale to fit within the normalized square (-1 to 1)
+            double normalizedX = (double) translatedX / maxHalfDimension;
+            double normalizedZ = (double) translatedZ / maxHalfDimension;
+
+            // Add to the list of normalized positions
+            normalizedPositions.add(new Pair<>(normalizedX, normalizedZ));
+
+            // Print out the details
+            System.out.println("(glass) Original Pos: " + pos + " Translated Pos: (" + translatedX + ", " + translatedZ + ") Normalized Pos: (" + normalizedX + ", " + normalizedZ + ")");
+        }
+
+
+        Vec3d facePos = new Vec3d(rootPos.getX(), rootPos.getY(), rootPos.getZ());
 
         this.portal = Portal.entityType.create(world);
         portal.setOriginPos(facePos);
@@ -109,8 +132,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         portal.setOrientationAndSize(
                 new Vec3d(0, 1, 0), // axisW
                 new Vec3d(0, 0, 1), // axisH
-                actualWidth,
-                actualHeight
+                halfWidth * 2,
+                halfDepth * 2
         );
 
         portal.specialShape = portalTriangles;
