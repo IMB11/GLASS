@@ -156,7 +156,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
 
         portal.specialShape = new GeometryPortalShape();
-        boundingBox.addSquares(this.getPos(), portal, targetDistance);
+        boundingBox.addSquares(this.getPos(), portal, 8);
 
         portal.getWorld().spawnEntity(portal);
 
@@ -223,8 +223,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             }
 
             if (this.boundingBox != null && this.portal != null) {
-                boundingBox.addSquares(this.getPos(), portal, 8);
-                portal.reloadAndSyncToClient();
+//                boundingBox.addSquares(this.getPos(), portal, 8);
+//                portal.reloadAndSyncToClient();
             }
 
             fadeoutTime = FADEOUT_TIME_MAX;
@@ -247,18 +247,21 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     private void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, int distanceFromRoot, BlockPos currentPos, World world) {
         Direction[] directionsToCheck = getDirections(plane);
         Queue<Pair<BlockPos, Integer>> queue = new LinkedList<>();
+        Set<BlockPos> visitedBlocks = new HashSet<>(); // Ensure you have a Set to track visited blocks
         queue.add(new Pair<>(currentPos, distanceFromRoot));
+        visitedBlocks.add(currentPos);
 
         while (!queue.isEmpty()) {
             Pair<BlockPos, Integer> current = queue.poll();
-            currentPos = current.getLeft();
+            BlockPos pos = current.getLeft();
             int currentDistance = current.getRight();
 
             for (Direction direction : directionsToCheck) {
-                BlockPos neighborPos = currentPos.offset(direction);
-                if (world.getBlockState(currentPos).getBlock() instanceof GlassBlock && visitedBlocks.add(currentPos)) {
+                BlockPos neighborPos = pos.offset(direction);
+                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
+                    visitedBlocks.add(neighborPos);
                     Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
-                    map.add(current);
+                    map.add(neighborPair);
                     queue.add(neighborPair);
 
                     // Update furthestBlock accordingly
