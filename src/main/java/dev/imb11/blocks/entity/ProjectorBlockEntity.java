@@ -4,6 +4,7 @@ import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.sync.ChannelManagerPersistence;
+import dev.imb11.util.BoundingBox2D;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
@@ -47,6 +48,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     public long deactiveSince = -1;
 
     public float rotationBeacon, rotationBeaconPrev;
+    private BoundingBox2D boundingBox;
 
     public ProjectorBlockEntity(BlockPos pos, BlockState state) {
         super(BLOCK_ENTITY_TYPE, pos, state);
@@ -68,77 +70,97 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     private Portal portal = null;
-    public void createPortal(ServerWorld world) {
-        var portalTriangles = new GeometryPortalShape();
+    public void createPortal(ServerWorld world, int targetDistance) {
+        this.boundingBox = null;
 
-        BlockPos rootPos = this.getPos();
-
-        // Initialize with extreme values for bounding box calculation
-        int minX = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxZ = Integer.MIN_VALUE;
-
-// Traverse the list of positions to determine the bounding box
-        for (Pair<BlockPos, Integer> pair : this.neighbouringGlassBlocks) {
-            BlockPos pos = pair.getLeft();
-
-            // Update min and max x and z
-            if (pos.getX() < minX) minX = pos.getX();
-            if (pos.getZ() < minZ) minZ = pos.getZ();
-            if (pos.getX() > maxX) maxX = pos.getX();
-            if (pos.getZ() > maxZ) maxZ = pos.getZ();
+        // Get where distance is 0, then make
+        for (Pair<BlockPos, Integer> neighbouringGlassBlock : neighbouringGlassBlocks) {
+            if (neighbouringGlassBlock.getRight() == 0) {
+                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), this.facing);
+                break;
+            }
         }
 
-// Step 1: Calculate the center of the bounding box
-        int centerX = (minX + maxX) / 2;
-        int centerZ = (minZ + maxZ) / 2;
-
-// Step 2: Determine the maximum half-dimension (to normalize to a square)
-        int halfWidth = Math.max((maxX - minX) / 2, 1);
-        int halfDepth = Math.max((maxZ - minZ) / 2, 1);
-        int maxHalfDimension = Math.max(halfWidth, halfDepth);
-
-// Step 3: Normalize each position
-        List<Pair<Double, Double>> normalizedPositions = new ArrayList<>();
-
-        for (Pair<BlockPos, Integer> pair : this.neighbouringGlassBlocks) {
-            BlockPos pos = pair.getLeft();
-
-            // Translate the position to the center of the bounding box
-            int translatedX = pos.getX() - centerX;
-            int translatedZ = pos.getZ() - centerZ;
-
-            // Scale to fit within the normalized square (-1 to 1)
-            double normalizedX = (double) translatedX / maxHalfDimension;
-            double normalizedZ = (double) translatedZ / maxHalfDimension;
-
-            // Add to the list of normalized positions
-            normalizedPositions.add(new Pair<>(normalizedX, normalizedZ));
-
-            // Print out the details
-            System.out.println("(glass) Original Pos: " + pos + " Translated Pos: (" + translatedX + ", " + translatedZ + ") Normalized Pos: (" + normalizedX + ", " + normalizedZ + ")");
+        if (boundingBox == null) {
+            Glass.LOGGER.error("Failed to create bounding box for rendering portal");
+            return;
         }
 
+        for (Pair<BlockPos, Integer> neighbouringGlassBlock : this.neighbouringGlassBlocks) {
+            BlockPos pos = neighbouringGlassBlock.getLeft();
+            int distance = neighbouringGlassBlock.getRight();
 
-        Vec3d facePos = new Vec3d(rootPos.getX(), rootPos.getY(), rootPos.getZ());
+            if (distance == 0) {
+                continue;
+            }
 
-        this.portal = Portal.entityType.create(world);
-        portal.setOriginPos(facePos);
+            if (boundingBox != null) {
+                boundingBox.addBlockPos(pos, distance);
+            }
+        }
+
+        Glass.LOGGER.info("Bounding box: " + boundingBox);
+
+        Portal portal = Portal.entityType.create(world);
         portal.setDestinationDimension(World.OVERWORLD);
-        portal.setDestination(new Vec3d(0, 70, 0));
+        portal.setDestination(new Vec3d(20, -57, 6));
         portal.setInteractable(false);
         portal.setTeleportable(false);
-        portal.setOrientationAndSize(
-                new Vec3d(0, 1, 0), // axisW
-                new Vec3d(0, 0, 1), // axisH
-                halfWidth * 2,
-                halfDepth * 2
-        );
 
-        portal.specialShape = portalTriangles;
+        Vec3d axisW;
+        Vec3d axisH;
+
+        switch (facing) {
+            case NORTH:
+                axisW = new Vec3d(1, 0, 0); // Width along X-axis
+                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
+                break;
+            case SOUTH:
+                axisW = new Vec3d(-1, 0, 0); // Width along -X-axis
+                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
+                break;
+            case EAST:
+                axisW = new Vec3d(0, 0, -1); // Width along -Z-axis
+                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
+                break;
+            case WEST:
+                axisW = new Vec3d(0, 0, 1); // Width along Z-axis
+                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
+                break;
+            case DOWN:
+                axisW = new Vec3d(1, 0, 0); // Width along X-axis
+                axisH = new Vec3d(0, 0, 1); // Height along Z-axis
+                break;
+            case UP:
+                axisW = new Vec3d(1, 0, 0); // Width along X-axis
+                axisH = new Vec3d(0, 0, -1); // Height along -Z-axis
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported facing direction: " + facing);
+        }
+
+        // Set portal orientation and size
+        portal.setOrientationAndSize(axisW, axisH, boundingBox.getWidth(), boundingBox.getHeight());
+
+        switch (facing) {
+            case NORTH, SOUTH:
+                // Adjust facepos accordingly
+                Vec3d facePos = boundingBox.getMidpoint();
+                facePos = facePos.add(new Vec3d(0.5D, 0.5D, 0.5D).multiply(BoundingBox2D.getRelativeUpVector(facing)));
+                facePos = facePos.add(new Vec3d(0.5D, 0, facing == Direction.SOUTH ? 1.0D : 0.0D));
+                facePos = facePos.add(new Vec3d(0.005D, 0.005D, 0.005D).multiply(Vec3d.of(facing.getVector())));
+
+                // Rotate 180 to face the opposite direction
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
+                portal.setOriginPos(facePos);
+        }
+
+        portal.specialShape = new GeometryPortalShape();
+        boundingBox.addSquares(this.getPos(), portal, targetDistance);
 
         portal.getWorld().spawnEntity(portal);
+
+        this.portal = portal;
     }
 
     @Override
@@ -196,9 +218,15 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
 
                 if(!world.isClient) {
-                    createPortal((ServerWorld) world);
+                    createPortal((ServerWorld) world, targetDistance);
                 }
             }
+
+            if (this.boundingBox != null && this.portal != null) {
+                boundingBox.addSquares(this.getPos(), portal, 8);
+                portal.reloadAndSyncToClient();
+            }
+
             fadeoutTime = FADEOUT_TIME_MAX;
         } else {
             activeSince = -1;
@@ -228,9 +256,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
             for (Direction direction : directionsToCheck) {
                 BlockPos neighborPos = currentPos.offset(direction);
-                if (world.getBlockState(neighborPos).getBlock() instanceof GlassBlock && visitedBlocks.add(neighborPos)) {
+                if (world.getBlockState(currentPos).getBlock() instanceof GlassBlock && visitedBlocks.add(currentPos)) {
                     Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
-                    map.add(neighborPair);
+                    map.add(current);
                     queue.add(neighborPair);
 
                     // Update furthestBlock accordingly
