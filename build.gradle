@@ -52,8 +52,13 @@ dependencies {
 
     modImplementation include("io.github.cottonmc:LibGui:${project.libgui_version}")
 
-    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:imm_ptl_core:v3.3.9-mc1.20.1")
-    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:q_misc_util:v3.3.9-mc1.20.1")
+    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:imm_ptl_core:v3.3.9-mc1.20.1") {
+        exclude(group: "org.lwjgl")
+    }
+    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:q_misc_util:v3.3.9-mc1.20.1") {
+        // exclude org.lwjg
+        exclude(group: "org.lwjgl")
+    }
 }
 
 processResources {
