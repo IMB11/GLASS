@@ -160,7 +160,19 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
         Portal portal = Portal.entityType.create(world);
         portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
-        portal.setDestination(channel.linkedBlock().toCenterPos()); // TODO: Add offset
+
+        Vec3d offset = switch (facing.getOpposite()) {
+            case NORTH -> new Vec3d(0, 0, -1);
+            case SOUTH -> new Vec3d(0, 0, 1);
+            case EAST -> new Vec3d(1, 0, 0);
+            case WEST -> new Vec3d(-1, 0, 0);
+            case UP -> new Vec3d(0, 1, 0);
+            case DOWN -> new Vec3d(0, -1, 0);
+        };
+
+        // Apply the offset to the destination position
+        portal.setDestination(channel.linkedBlock().toCenterPos().add(offset));
+
         portal.setInteractable(false);
         portal.setTeleportable(false);
 
@@ -298,17 +310,14 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             for (Direction direction : directionsToCheck) {
                 BlockPos neighborPos = pos.offset(direction);
                 if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
-                    BlockPos facePos = neighborPos.offset(plane);
-                    if (world.getBlockState(facePos).isAir()) {
-                        visitedBlocks.add(neighborPos);
-                        Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
-                        map.add(neighborPair);
-                        queue.add(neighborPair);
+                    visitedBlocks.add(neighborPos);
+                    Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
+                    map.add(neighborPair);
+                    queue.add(neighborPair);
 
-                        // Update furthestBlock accordingly
-                        if (currentDistance + 1 > furthestBlock) {
-                            furthestBlock = currentDistance + 1;
-                        }
+                    // Update furthestBlock accordingly
+                    if (currentDistance + 1 > furthestBlock) {
+                        furthestBlock = currentDistance + 1;
                     }
                 }
             }
