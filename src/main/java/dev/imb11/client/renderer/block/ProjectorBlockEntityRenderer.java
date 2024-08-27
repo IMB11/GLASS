@@ -1,5 +1,6 @@
 package dev.imb11.client.renderer.block;
 
+import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
 import net.minecraft.block.Blocks;
@@ -12,7 +13,6 @@ import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import org.joml.Quaternionf;
 
@@ -24,8 +24,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
     public ProjectorBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {}
 
-    private static float interpolateRotation(float prevRotation, float nextRotation, float partialTick)
-    {
+    private static float interpolateRotation(float prevRotation, float nextRotation, float partialTick) {
         float f3;
 
         f3 = nextRotation - prevRotation;
@@ -50,7 +49,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         float scale = 0.5f;
 
-        Direction direction = entity.facing;
+        Direction direction = entity.getCachedState().get(ProjectorBlock.FACING);
         if (direction == Direction.DOWN) {
             matrices.multiply(new Quaternionf().rotationXYZ((float) Math.toRadians(180.0f), 0.0f, 0.0f));
         } else if (direction.getHorizontal() >= 0) {
@@ -81,17 +80,15 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         matrices.pop();
 
-        Direction facing = entity.facing;
-
         int maxDistance = entity.furthestBlock + 3;
 
         // Render the world onto the facing direction.
-        if(framebuffer == null) {
+        if (framebuffer == null) {
             framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
         }
 
         matrices.push();
-        ProjectorRenderingHelper.renderEdgePanels(matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        ProjectorRenderingHelper.renderEdgePanels(matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
 
 //        matrices.push();

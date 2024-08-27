@@ -20,13 +20,11 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 
 public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static BlockEntityType<TerminalBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(TerminalBlockEntity::new, GBlocks.TERMINAL).build();
 
-    public Direction facing = Direction.UP;
     public String channel = "";
 
     public TerminalBlockEntity(BlockPos pos, BlockState state) {
@@ -35,14 +33,11 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
 
     @Override
     public void writeNbt(NbtCompound tag) {
-        // Save the current value of the number to the tag
-        tag.putInt("facing", facing.getId());
         tag.putString("channel", channel);
     }
 
     @Override
     public void readNbt(NbtCompound tag) {
-        facing = Direction.byId(tag.getInt("facing"));
         channel = tag.getString("channel");
     }
 

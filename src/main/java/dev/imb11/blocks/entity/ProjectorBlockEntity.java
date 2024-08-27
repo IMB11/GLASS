@@ -2,6 +2,7 @@ package dev.imb11.blocks.entity;
 
 import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
+import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.util.BoundingBox2D;
@@ -34,14 +35,14 @@ import qouteall.q_misc_util.my_util.DQuaternion;
 import java.util.*;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
-    public static int FADEOUT_TIME_MAX = 12;    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
+    public static int FADEOUT_TIME_MAX = 12;
+    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
     public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
     private final Set<BlockPos> visitedBlocks = new HashSet<>();
     public int fadeoutTime = 12;
     public boolean active = false;
     public long activeSince = -1;
     public String channel = "";
-    public Direction facing = Direction.UP;
     // Rendering variables
     public int targetDistance = 0;
     public long deactiveSince = -1;
@@ -104,7 +105,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public void writeNbt(NbtCompound tag) {
-        tag.putInt("facing", facing.getId());
         tag.putFloat("rotationBeacon", rotationBeacon);
         tag.putFloat("rotationBeaconPrev", rotationBeaconPrev);
         tag.putString("channel", channel);
@@ -120,10 +120,12 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     public void createPortal(ServerWorld world, int targetDistance) {
         this.boundingBox = null;
 
+        Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
+
         // Get where distance is 0, then make
         for (Pair<BlockPos, Integer> neighbouringGlassBlock : neighbouringGlassBlocks) {
             if (neighbouringGlassBlock.getRight() == 0) {
-                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), this.facing);
+                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), facing);
                 break;
             }
         }
@@ -215,7 +217,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public void readNbt(NbtCompound tag) {
-        facing = Direction.byId(tag.getInt("facing"));
         channel = tag.getString("channel");
         rotationBeacon = tag.getFloat("rotationBeacon");
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
@@ -261,6 +262,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 visitedBlocks.clear();
                 neighbouringGlassBlocks.add(new Pair<>(pos, 0));
                 visitedBlocks.add(pos);
+                Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
 
                 if (!world.isClient) {

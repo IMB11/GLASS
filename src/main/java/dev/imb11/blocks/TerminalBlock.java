@@ -10,22 +10,21 @@ import net.minecraft.block.BlockWithEntity;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.state.property.DirectionProperty;
+import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Objects;
 
 public class TerminalBlock extends BlockWithEntity {
     public TerminalBlock(Settings settings) {
         super(settings);
     }
 
-    private Direction _tempFacing = Direction.UP;
+    public static final DirectionProperty FACING = Properties.FACING;
 
     @Override
     public BlockRenderType getRenderType(BlockState state) {
@@ -34,16 +33,16 @@ public class TerminalBlock extends BlockWithEntity {
 
     @Override
     public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
-        var entity = new TerminalBlockEntity(pos, state);
-        entity.facing = _tempFacing;
-        return entity;
+        return new TerminalBlockEntity(pos, state);
     }
 
     @Override
     public void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
         super.onBreak(world, pos, state, player);
 
-        if(world.isClient) return;
+        if (world.isClient) {
+            return;
+        }
 
         ChannelManagerPersistence persistence = ChannelManagerPersistence.get(world);
 
@@ -64,7 +63,9 @@ public class TerminalBlock extends BlockWithEntity {
         // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
         // such as the one from BlockWithEntity
 
-        if(world.isClient) return ActionResult.PASS;
+        if (world.isClient) {
+            return ActionResult.PASS;
+        }
 
         ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.createScreenHandlerFactory(world, pos);
 
@@ -76,7 +77,6 @@ public class TerminalBlock extends BlockWithEntity {
     @Nullable
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
-        _tempFacing = Direction.getLookDirectionForAxis(Objects.requireNonNull(ctx.getPlayer()), ctx.getPlayerLookDirection().getAxis());
-        return super.getPlacementState(ctx);
+        return this.getDefaultState().with(FACING, ctx.getPlayerLookDirection().getOpposite().getOpposite());
     }
 }
