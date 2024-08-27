@@ -29,22 +29,8 @@ import java.util.ArrayList;
 public class ProjectorRenderingHelper {
     public static boolean isRendering = false;
 
-    public static void renderEdgePanels(MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
+    public static void renderEdgePanels(Vec3d rootPos, MatrixStack matrices, Direction direction, ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks, int targetDistance, int maxDistance) {
         // Draw a full screen white quad to prevent behind the block showing through
-
-        // Get the root BlockPos
-        BlockPos rootPos = null;
-        for (Pair<BlockPos, Integer> pair : neighbouringGlassBlocks) {
-            if (pair.getRight() == 0) {
-                rootPos = pair.getLeft();
-                break;
-            }
-        }
-
-        if (rootPos == null) {
-            return; // No root position found, exit the function
-        }
-
         float r = 1f, g = 1f, b = 1f;
 
         // Iterate over neighbouring blocks and render if within target distance
@@ -53,7 +39,7 @@ public class ProjectorRenderingHelper {
             int distance = pair.getRight();
 
             if (distance >= targetDistance - 2 && distance <= targetDistance) {
-                BlockPos relativePos = blockPos.subtract(rootPos);
+                Vec3d relativePos = new Vec3d(blockPos.getX() - rootPos.getX(), blockPos.getY() - rootPos.getY(), blockPos.getZ() - rootPos.getZ());
 
                 float oldR = r;
                 float oldG = g;
@@ -65,7 +51,10 @@ public class ProjectorRenderingHelper {
 
                 // Push matrix to manipulate position
                 matrices.push();
+
                 matrices.translate(relativePos.getX(), relativePos.getY(), relativePos.getZ());
+                Vec3d zFightFix = new Vec3d(0.001, 0.001, 0.001).multiply(Vec3d.of(direction.getVector()));
+                matrices.translate(zFightFix.getX(), zFightFix.getY(), zFightFix.getZ());
 
                 Matrix4f positionMatrix = matrices.peek().getPositionMatrix();
                 Tessellator tessellator = Tessellator.getInstance();

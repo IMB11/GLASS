@@ -1,16 +1,18 @@
 package dev.imb11.util;
 
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import qouteall.imm_ptl.core.portal.GeometryPortalShape;
 import qouteall.imm_ptl.core.portal.Portal;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class BoundingBox2D {
-    private int min1, min2;
-    private int max1, max2;
+    private float min1, min2;
+    private float max1, max2;
     private final String plane; // e.g., "XY", "XZ", "YZ"
     private final int fixedCoord;
     private final HashMap<Vec3d, Integer> distanceMap = new HashMap<>();
@@ -27,13 +29,16 @@ public class BoundingBox2D {
                 "} where width = '" + getWidth() + "' and height = '" + getHeight() + "'";
     }
 
-    public void addSquares(BlockPos rootPos, Portal portal, int targetDistance) {
+    public void addSquares(BlockPos projectorPos, Portal portal, int targetDistance, boolean flip) {
         // portalShape.addTriangleForRectangle(double x1, double y1, double x2, double y2);
+
         portal.specialShape = new GeometryPortalShape();
-        for (var entry : distanceMap.entrySet()) {
+        for (var entry : new ArrayList<>(distanceMap.entrySet()) {{
+            this.add(new HashMap.SimpleEntry<>(Vec3d.of(projectorPos), 0));
+        }}) {
             var pos = entry.getKey();
             var distance = entry.getValue();
-            var relativePos = pos.subtract(Vec3d.of(rootPos));
+            var relativePos = pos.subtract(getMidpoint());
             var x = relativePos.x;
             var y = relativePos.y;
 
@@ -42,10 +47,11 @@ public class BoundingBox2D {
             }
         }
 
-        // Add rootPos to the portal
-        portal.specialShape.addTriangleForRectangle(0, 0, 1, 1);
-
         portal.specialShape.normalize(this.getWidth(), this.getHeight());
+
+        if (flip) {
+            portal.specialShape = portal.specialShape.getFlippedWithScaling(1.0f);
+        }
     }
 
     public BoundingBox2D(BlockPos initialPos, Direction direction) {
@@ -77,7 +83,7 @@ public class BoundingBox2D {
     }
 
     public void addBlockPos(BlockPos pos, int distance) {
-        int coord1, coord2;
+        float coord1, coord2;
 
         switch (plane) {
             case "XZ":
@@ -102,11 +108,11 @@ public class BoundingBox2D {
         max2 = Math.max(max2, coord2);
     }
 
-    public int getWidth() {
+    public float getWidth() {
         return max1 - min1 + 1;
     }
 
-    public int getHeight() {
+    public float getHeight() {
         return max2 - min2 + 1;
     }
 
@@ -119,22 +125,18 @@ public class BoundingBox2D {
     }
 
     public static Vec3d getRelativeUpVector(Direction direction) {
-        switch (direction) {
-            case NORTH:
-            case SOUTH:
-            case EAST:
-            case WEST:
-                return Vec3d.of(Direction.UP.getVector());
-            case UP:
-                return Vec3d.of(Direction.NORTH.getVector());
-            case DOWN:
-                return Vec3d.of(Direction.SOUTH.getVector());
-            default:
-                throw new IllegalArgumentException("Unsupported direction: " + direction);
-        }
+        return switch (direction) {
+            case NORTH, SOUTH, EAST, WEST -> Vec3d.of(Direction.UP.getVector());
+            case UP -> Vec3d.of(Direction.NORTH.getVector());
+            case DOWN -> Vec3d.of(Direction.SOUTH.getVector());
+        };
     }
 
     public Vec3d getMidpoint() {
-        return new Vec3d((min1 + max1) / 2.0, (min2 + max2) / 2.0, fixedCoord);
+        return switch (plane) {
+            case "XY" -> new Vec3d(min1 + getWidth() / 2, min2 + getHeight() / 2, fixedCoord);
+            case "XZ" -> new Vec3d(min1 + getWidth() / 2, fixedCoord, min2 + getHeight() / 2);
+            default -> null;
+        };
     }
 }

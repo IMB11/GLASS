@@ -14,6 +14,7 @@ import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Quaternionf;
 
 import java.util.Objects;
@@ -88,7 +89,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         }
 
         matrices.push();
-        ProjectorRenderingHelper.renderEdgePanels(matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        ProjectorRenderingHelper.renderEdgePanels(Vec3d.of(entity.getPos()), matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
         matrices.pop();
 
 //        matrices.push();
