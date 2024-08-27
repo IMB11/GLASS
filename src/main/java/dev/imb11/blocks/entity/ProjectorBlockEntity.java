@@ -160,60 +160,32 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         portal.setInteractable(false);
         portal.setTeleportable(false);
 
-        Vec3d axisW;
-        Vec3d axisH;
+        // Set portal size
+        portal.setWidth(boundingBox.getWidth());
+        portal.setHeight(boundingBox.getHeight());
 
-        switch (facing) {
-            case NORTH:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case SOUTH:
-                axisW = new Vec3d(-1, 0, 0); // Width along -X-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case EAST:
-                axisW = new Vec3d(0, 0, -1); // Width along -Z-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case WEST:
-                axisW = new Vec3d(0, 0, 1); // Width along Z-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case DOWN:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 0, 1); // Height along Z-axis
-                break;
-            case UP:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 0, -1); // Height along -Z-axis
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported facing direction: " + facing);
-        }
-
-        // Set portal orientation and size
-        portal.setOrientationAndSize(axisW, axisH, boundingBox.getWidth(), boundingBox.getHeight());
-
-        Vec3d facePos = this.boundingBox.getMidpoint();
-//        facePos = new Vec3d(facePos.x, Math.floor(facePos.y), Math.floor(facePos.z));
-
-        boolean shouldFlip = switch (facing) {
-            case NORTH -> true;
-            default -> false;
-        };
-
+        // Set portal orientation
         switch (facing) {
             case NORTH, SOUTH:
-                facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
                 portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
                 break;
-            default:
+            case EAST, WEST:
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.EAST ? 90 : -90));
+                break;
+            case UP, DOWN:
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(1, 0, 0), facing == Direction.DOWN ? 90 : -90));
                 break;
         }
 
+        // Populate portal tiles
+        boolean shouldFlip = facing.getDirection() == Direction.AxisDirection.NEGATIVE;
         boundingBox.addSquares(this.getPos(), portal, 0, shouldFlip);
+
+        // Set portal position
+        Vec3d facePos = this.boundingBox.getMidpoint();
+        facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
         portal.setOriginPos(facePos);
+
         portal.getWorld().spawnEntity(portal);
 
         this.portal = portal;

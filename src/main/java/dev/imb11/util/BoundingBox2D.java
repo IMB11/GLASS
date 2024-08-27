@@ -1,6 +1,5 @@
 package dev.imb11.util;
 
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
@@ -10,10 +9,12 @@ import qouteall.imm_ptl.core.portal.Portal;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import static net.minecraft.util.math.Direction.*;
+
 public class BoundingBox2D {
     private float min1, min2;
     private float max1, max2;
-    private final String plane; // e.g., "XY", "XZ", "YZ"
+    private final Direction facing;
     private final int fixedCoord;
     private final HashMap<Vec3d, Integer> distanceMap = new HashMap<>();
 
@@ -24,14 +25,12 @@ public class BoundingBox2D {
                 ", min2=" + min2 +
                 ", max1=" + max1 +
                 ", max2=" + max2 +
-                ", plane='" + plane + '\'' +
+                ", facing='" + facing + '\'' +
                 ", fixedCoord=" + fixedCoord +
                 "} where width = '" + getWidth() + "' and height = '" + getHeight() + "'";
     }
 
     public void addSquares(BlockPos projectorPos, Portal portal, int targetDistance, boolean flip) {
-        // portalShape.addTriangleForRectangle(double x1, double y1, double x2, double y2);
-
         portal.specialShape = new GeometryPortalShape();
         for (var entry : new ArrayList<>(distanceMap.entrySet()) {{
             this.add(new HashMap.SimpleEntry<>(Vec3d.of(projectorPos), 0));
@@ -39,8 +38,23 @@ public class BoundingBox2D {
             var pos = entry.getKey();
             var distance = entry.getValue();
             var relativePos = pos.subtract(getMidpoint());
-            var x = relativePos.x;
-            var y = relativePos.y;
+
+            double x = 0;
+            double y = 0;
+            switch (this.facing) {
+                case NORTH, SOUTH -> {
+                    x = relativePos.x;
+                    y = relativePos.y;
+                }
+                case EAST, WEST -> {
+                    x = relativePos.z;
+                    y = relativePos.y;
+                }
+                case UP, DOWN -> {
+                    x = relativePos.x;
+                    y = relativePos.z;
+                }
+            }
 
             if (distance <= targetDistance) {
                 portal.specialShape.addTriangleForRectangle(x, y, x + 1, y + 1);
@@ -56,23 +70,17 @@ public class BoundingBox2D {
 
     public BoundingBox2D(BlockPos initialPos, Direction direction) {
         switch (direction) {
-            case NORTH:
-            case SOUTH:
-                plane = "XY";
+            case NORTH, SOUTH:
                 min1 = max1 = initialPos.getX();
                 min2 = max2 = initialPos.getY();
                 fixedCoord = initialPos.getZ();
                 break;
-            case EAST:
-            case WEST:
-                plane = "XY";
-                min1 = max1 = initialPos.getX();
+            case EAST, WEST:
+                min1 = max1 = initialPos.getZ();
                 min2 = max2 = initialPos.getY();
-                fixedCoord = initialPos.getY();
+                fixedCoord = initialPos.getX();
                 break;
-            case UP:
-            case DOWN:
-                plane = "XZ";
+            case UP, DOWN:
                 min1 = max1 = initialPos.getX();
                 min2 = max2 = initialPos.getZ();
                 fixedCoord = initialPos.getY();
@@ -80,21 +88,33 @@ public class BoundingBox2D {
             default:
                 throw new IllegalArgumentException("Unsupported direction: " + direction);
         }
+        this.facing = direction;
     }
 
     public void addBlockPos(BlockPos pos, int distance) {
         float coord1, coord2;
 
-        switch (plane) {
-            case "XZ":
+        switch (this.facing) {
+            case UP, DOWN:
                 coord1 = pos.getX();
                 coord2 = pos.getZ();
-                if (pos.getY() != fixedCoord) return;
+                if (pos.getY() != fixedCoord) {
+                    return;
+                }
                 break;
-            case "XY":
+            case NORTH, SOUTH:
                 coord1 = pos.getX();
                 coord2 = pos.getY();
-                if (pos.getZ() != fixedCoord) return;
+                if (pos.getZ() != fixedCoord) {
+                    return;
+                }
+                break;
+            case EAST, WEST:
+                coord1 = pos.getZ();
+                coord2 = pos.getY();
+                if (pos.getX() != fixedCoord) {
+                    return;
+                }
                 break;
             default:
                 return;
@@ -116,8 +136,8 @@ public class BoundingBox2D {
         return max2 - min2 + 1;
     }
 
-    public String getPlane() {
-        return plane;
+    public Direction getFacing() {
+        return this.facing;
     }
 
     public int getFixedCoord() {
@@ -126,17 +146,17 @@ public class BoundingBox2D {
 
     public static Vec3d getRelativeUpVector(Direction direction) {
         return switch (direction) {
-            case NORTH, SOUTH, EAST, WEST -> Vec3d.of(Direction.UP.getVector());
+            case NORTH, SOUTH, EAST, WEST -> Vec3d.of(UP.getVector());
             case UP -> Vec3d.of(Direction.NORTH.getVector());
-            case DOWN -> Vec3d.of(Direction.SOUTH.getVector());
+            case DOWN -> Vec3d.of(SOUTH.getVector());
         };
     }
 
     public Vec3d getMidpoint() {
-        return switch (plane) {
-            case "XY" -> new Vec3d(min1 + getWidth() / 2, min2 + getHeight() / 2, fixedCoord);
-            case "XZ" -> new Vec3d(min1 + getWidth() / 2, fixedCoord, min2 + getHeight() / 2);
-            default -> null;
+        return switch (this.facing) {
+            case NORTH, SOUTH -> new Vec3d(min1 + getWidth() / 2, min2 + getHeight() / 2, this.facing == SOUTH ? fixedCoord + 1 : fixedCoord);
+            case UP, DOWN -> new Vec3d(min1 + getWidth() / 2, this.facing == UP ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2);
+            case EAST, WEST -> new Vec3d(this.facing == EAST ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2, min1 + getWidth() / 2);
         };
     }
 }
