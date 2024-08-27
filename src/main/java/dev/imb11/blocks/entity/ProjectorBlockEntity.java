@@ -27,7 +27,6 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
-import qouteall.imm_ptl.core.portal.GeometryPortalShape;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.q_misc_util.my_util.DQuaternion;
 
@@ -47,7 +46,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     public long deactiveSince = -1;
     public float rotationBeacon, rotationBeaconPrev;
     public int furthestBlock = 0;
-    private BoundingBox2D boundingBox;
+    public BoundingBox2D boundingBox;
     private Portal portal = null;
 
     public ProjectorBlockEntity(BlockPos pos, BlockState state) {
@@ -76,13 +75,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
         be.rotationBeaconPrev = be.rotationBeacon;
 
-
         if (be.active && be.activeSince != -1) {
             long activeSince = be.activeSince;
             be.deactiveSince = -1;
-            if (be.activeSince == -1) {
-                be.activeSince = activeSince;
-            }
 
             int maxDistance = be.furthestBlock + 3;
             be.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
@@ -94,7 +89,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             }
 
             // Decrement the target distance to -1 every 25ms
-            if (be.targetDistance > -3 && System.currentTimeMillis() - be.deactiveSince > 25L) {
+            if (be.targetDistance > -1 && System.currentTimeMillis() - be.deactiveSince > 25L) {
                 be.targetDistance--;
                 be.deactiveSince = System.currentTimeMillis();
                 be.markDirty();
@@ -117,7 +112,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         super.writeNbt(tag);
     }
 
-    public void createPortal(ServerWorld world, int targetDistance) {
+    public void createPortal(ServerWorld world) {
         this.boundingBox = null;
 
         // Get where distance is 0, then make
@@ -189,25 +184,25 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         // Set portal orientation and size
         portal.setOrientationAndSize(axisW, axisH, boundingBox.getWidth(), boundingBox.getHeight());
 
+        Vec3d facePos = this.boundingBox.getMidpoint();
+//        facePos = new Vec3d(facePos.x, Math.floor(facePos.y), Math.floor(facePos.z));
+
+        boolean shouldFlip = switch (facing) {
+            case NORTH -> true;
+            default -> false;
+        };
+
         switch (facing) {
             case NORTH, SOUTH:
-                // Adjust facepos accordingly
-                Vec3d facePos = boundingBox.getMidpoint();
-
-                // TODO: FX look at this, how do I properly center the portal? This only works for one use-case of the portal.
-                facePos = facePos.add(new Vec3d(0.5D, 0.5D, 0.5D).multiply(BoundingBox2D.getRelativeUpVector(facing)));
-                facePos = facePos.add(new Vec3d(0.5D, 0, facing == Direction.SOUTH ? 1.0D : 0.0D));
-                facePos = facePos.add(2, 0, 0);
-                facePos = facePos.add(new Vec3d(0.005D, 0.005D, 0.005D).multiply(Vec3d.of(facing.getVector())));
-
-                // Rotate 180 to face the opposite direction
+                facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
                 portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
-                portal.setOriginPos(facePos);
+                break;
+            default:
+                break;
         }
 
-        portal.specialShape = new GeometryPortalShape();
-        boundingBox.addSquares(this.getPos(), portal, targetDistance);
-
+        boundingBox.addSquares(this.getPos(), portal, 0, shouldFlip);
+        portal.setOriginPos(facePos);
         portal.getWorld().spawnEntity(portal);
 
         this.portal = portal;
@@ -264,7 +259,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
 
                 if (!world.isClient) {
-                    createPortal((ServerWorld) world, targetDistance);
+                    createPortal((ServerWorld) world);
                 }
             }
 
@@ -285,7 +280,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
 
         if (this.boundingBox != null && this.portal != null) {
-            boundingBox.addSquares(this.getPos(), portal, targetDistance);
+            boolean shouldFlip = switch (facing) {
+                case NORTH -> true;
+                default -> false;
+            };
+            boundingBox.addSquares(this.getPos(), portal, Math.max(targetDistance, 0), shouldFlip);
             portal.reloadAndSyncToClient();
         }
     }
@@ -318,6 +317,4 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             }
         }
     }
-
-
 }
