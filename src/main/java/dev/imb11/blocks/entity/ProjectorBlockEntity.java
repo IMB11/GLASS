@@ -2,7 +2,9 @@ package dev.imb11.blocks.entity;
 
 import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
+import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
+import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.util.BoundingBox2D;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -33,14 +35,14 @@ import qouteall.q_misc_util.my_util.DQuaternion;
 import java.util.*;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
-    public static int FADEOUT_TIME_MAX = 12;    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
+    public static int FADEOUT_TIME_MAX = 12;
+    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
     public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
     private final Set<BlockPos> visitedBlocks = new HashSet<>();
     public int fadeoutTime = 12;
     public boolean active = false;
     public long activeSince = -1;
     public String channel = "";
-    public Direction facing = Direction.UP;
     // Rendering variables
     public int targetDistance = 0;
     public long deactiveSince = -1;
@@ -99,7 +101,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public void writeNbt(NbtCompound tag) {
-        tag.putInt("facing", facing.getId());
         tag.putFloat("rotationBeacon", rotationBeacon);
         tag.putFloat("rotationBeaconPrev", rotationBeaconPrev);
         tag.putString("channel", channel);
@@ -115,10 +116,12 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     public void createPortal(ServerWorld world) {
         this.boundingBox = null;
 
+        Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
+
         // Get where distance is 0, then make
         for (Pair<BlockPos, Integer> neighbouringGlassBlock : neighbouringGlassBlocks) {
             if (neighbouringGlassBlock.getRight() == 0) {
-                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), this.facing);
+                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), facing);
                 break;
             }
         }
@@ -143,66 +146,46 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
         Glass.LOGGER.info("Bounding box: " + boundingBox);
 
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(world);
+        Channel channel = channelManager.CHANNELS.get(this.channel);
+
+        if (channel == null || channel.linkedBlock() == null) {
+            Glass.LOGGER.error("This projector is not linked to a valid channel!");
+            return;
+        }
+
         Portal portal = Portal.entityType.create(world);
-        portal.setDestinationDimension(World.OVERWORLD);
-        portal.setDestination(new Vec3d(20, -57, 6));
+        portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
+        portal.setDestination(channel.linkedBlock().toCenterPos()); // TODO: Add offset
         portal.setInteractable(false);
         portal.setTeleportable(false);
 
-        Vec3d axisW;
-        Vec3d axisH;
+        // Set portal size
+        portal.setWidth(boundingBox.getWidth());
+        portal.setHeight(boundingBox.getHeight());
 
-        switch (facing) {
-            case NORTH:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case SOUTH:
-                axisW = new Vec3d(-1, 0, 0); // Width along -X-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case EAST:
-                axisW = new Vec3d(0, 0, -1); // Width along -Z-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case WEST:
-                axisW = new Vec3d(0, 0, 1); // Width along Z-axis
-                axisH = new Vec3d(0, 1, 0); // Height along Y-axis
-                break;
-            case DOWN:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 0, 1); // Height along Z-axis
-                break;
-            case UP:
-                axisW = new Vec3d(1, 0, 0); // Width along X-axis
-                axisH = new Vec3d(0, 0, -1); // Height along -Z-axis
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported facing direction: " + facing);
-        }
-
-        // Set portal orientation and size
-        portal.setOrientationAndSize(axisW, axisH, boundingBox.getWidth(), boundingBox.getHeight());
-
-        Vec3d facePos = this.boundingBox.getMidpoint();
-//        facePos = new Vec3d(facePos.x, Math.floor(facePos.y), Math.floor(facePos.z));
-
-        boolean shouldFlip = switch (facing) {
-            case NORTH -> true;
-            default -> false;
-        };
-
+        // Set portal orientation
         switch (facing) {
             case NORTH, SOUTH:
-                facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
                 portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
                 break;
-            default:
+            case EAST, WEST:
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.EAST ? 90 : -90));
+                break;
+            case UP, DOWN:
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(1, 0, 0), facing == Direction.DOWN ? 90 : -90));
                 break;
         }
 
+        // Populate portal tiles
+        boolean shouldFlip = facing.getDirection() == Direction.AxisDirection.NEGATIVE;
         boundingBox.addSquares(this.getPos(), portal, 0, shouldFlip);
+
+        // Set portal position
+        Vec3d facePos = this.boundingBox.getMidpoint();
+        facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
         portal.setOriginPos(facePos);
+
         portal.getWorld().spawnEntity(portal);
 
         this.portal = portal;
@@ -210,7 +193,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public void readNbt(NbtCompound tag) {
-        facing = Direction.byId(tag.getInt("facing"));
         channel = tag.getString("channel");
         rotationBeacon = tag.getFloat("rotationBeacon");
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
@@ -249,6 +231,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     public void tick(World world) {
+        Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
         if (active) {
             if (activeSince == -1) {
                 activeSince = System.currentTimeMillis();

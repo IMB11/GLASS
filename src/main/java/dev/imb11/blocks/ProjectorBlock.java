@@ -15,21 +15,19 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.DirectionProperty;
+import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
-
 public class ProjectorBlock extends BlockWithEntity {
 
-    public static BooleanProperty POWERED = BooleanProperty.of("powered");
-
-    private Direction _tempFacing = Direction.UP;
+    public static final BooleanProperty POWERED = Properties.POWERED;
+    public static final DirectionProperty FACING = Properties.FACING;
 
     public ProjectorBlock(Settings settings) {
         super(settings);
@@ -38,20 +36,18 @@ public class ProjectorBlock extends BlockWithEntity {
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(POWERED);
+        builder.add(FACING, POWERED);
     }
 
     @Nullable
     @Override
     public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
-        ProjectorBlockEntity entity = new ProjectorBlockEntity(pos, state);
-        entity.facing = _tempFacing;
-        return entity;
+        return new ProjectorBlockEntity(pos, state);
     }
 
     @Override
     public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
-        if(world.isReceivingRedstonePower(pos)) {
+        if (world.isReceivingRedstonePower(pos)) {
             world.playSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.BLOCKS, 1.5f, 0.2f, true);
             setDefaultState(state.with(POWERED, true));
         } else {
@@ -68,7 +64,9 @@ public class ProjectorBlock extends BlockWithEntity {
         // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
         // such as the one from BlockWithEntity
 
-        if(world.isClient) return ActionResult.PASS;
+        if (world.isClient) {
+            return ActionResult.PASS;
+        }
 
         ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.createScreenHandlerFactory(world, pos);
 
@@ -85,8 +83,7 @@ public class ProjectorBlock extends BlockWithEntity {
     @Nullable
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
-        _tempFacing = Direction.getLookDirectionForAxis(Objects.requireNonNull(ctx.getPlayer()), ctx.getPlayerLookDirection().getAxis()).getOpposite();
-        return super.getPlacementState(ctx);
+        return this.getDefaultState().with(FACING, ctx.getPlayerLookDirection().getOpposite());
     }
 
     @Override

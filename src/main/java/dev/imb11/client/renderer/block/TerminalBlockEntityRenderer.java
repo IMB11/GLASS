@@ -1,5 +1,6 @@
 package dev.imb11.client.renderer.block;
 
+import dev.imb11.blocks.TerminalBlock;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
@@ -9,6 +10,7 @@ import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
 import org.apache.commons.lang3.ArrayUtils;
 import org.joml.Quaternionf;
 
@@ -20,6 +22,8 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
     @Override
     public void render(TerminalBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
+        Direction facing = entity.getCachedState().get(TerminalBlock.FACING);
+
         matrices.push();
 
 //        matrices.translate(0.25f, 0.5f-(0.25f/2f), 0.80f);
@@ -28,13 +32,17 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
         matrices.translate(0.5, 0.5, 0.5);
 
-        var e = new float[] {45, entity.facing.getOffsetX(), entity.facing.getOffsetY(), entity.facing.getOffsetZ() };
+        var e = new float[] {45, facing.getOffsetX(), facing.getOffsetY(), facing.getOffsetZ() };
 
         boolean needBreak = false;
         for (float v : e) {
-            if(needBreak) break;
-            if(v == e[0]) continue;
-            if(v != 0) {
+            if (needBreak) {
+                break;
+            }
+            if (v == e[0]) {
+                continue;
+            }
+            if (v != 0) {
                 int axis = ArrayUtils.indexOf(e, v) - 1;
                 switch (axis) {
                     case 0 -> {
@@ -55,7 +63,7 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
         matrices.translate(-0.5, -0.5, -0.5);
         matrices.translate(0.375, 0.375, 0.375);
-        matrices.translate(entity.facing.getOffsetX() * -0.4D, entity.facing.getOffsetY() * -0.4D, entity.facing.getOffsetZ() * -0.4D);
+        matrices.translate(facing.getOffsetX() * -0.4D, facing.getOffsetY() * -0.4D, facing.getOffsetZ() * -0.4D);
 
         matrices.scale(scale, scale, scale);
 
