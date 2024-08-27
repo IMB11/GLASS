@@ -4,6 +4,7 @@ import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
+import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.util.BoundingBox2D;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -150,9 +151,17 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
         Glass.LOGGER.info("Bounding box: " + boundingBox);
 
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(world);
+        Channel channel = channelManager.CHANNELS.get(this.channel);
+
+        if (channel == null || channel.linkedBlock() == null) {
+            Glass.LOGGER.error("This projector is not linked to a valid channel!");
+            return;
+        }
+
         Portal portal = Portal.entityType.create(world);
-        portal.setDestinationDimension(World.OVERWORLD);
-        portal.setDestination(new Vec3d(20, -57, 6));
+        portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
+        portal.setDestination(channel.linkedBlock().toCenterPos()); // TODO: Add offset
         portal.setInteractable(false);
         portal.setTeleportable(false);
 

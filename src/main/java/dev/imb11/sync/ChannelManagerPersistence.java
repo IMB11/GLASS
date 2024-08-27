@@ -3,7 +3,6 @@ package dev.imb11.sync;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtIntArray;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -30,14 +29,14 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
 
     private static final Logger LOGGER = LogManager.getLogger("ChannelManagerPersistence");
 
-    public final ArrayList<Channel> CHANNELS = new ArrayList<>();
+    public final Map<String, Channel> CHANNELS = new HashMap<>();
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt) {
 
         NbtList channels = new NbtList();
 
-        for (Channel channel : CHANNELS) {
+        for (Channel channel : CHANNELS.values()) {
             NbtCompound item = new NbtCompound();
             item.putString("name", channel.name());
             if (channel.linkedBlock() != null)
@@ -76,7 +75,7 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
 
             @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : getFromIntArrayNBT("linked_pos", channel);
             Channel channel1 = new Channel(channel.getString("name"), bpos);
-            persistence.CHANNELS.add(channel1);
+            persistence.CHANNELS.put(channel1.name(), channel1);
             LOGGER.info("Loaded Channel: " + channel1);
         }
 
@@ -102,92 +101,98 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
 
     @Override
     public boolean contains(Object o) {
-        return CHANNELS.contains(o);
+        return CHANNELS.containsValue(o);
+    }
+
+    public boolean containsName(String channelName) {
+        return CHANNELS.containsKey(channelName);
     }
 
     @NotNull
     @Override
     public Iterator<Channel> iterator() {
-        return CHANNELS.iterator();
+        return CHANNELS.values().iterator();
     }
 
     @NotNull
     @Override
     public Object[] toArray() {
-        return CHANNELS.toArray();
+        return CHANNELS.values().toArray();
     }
 
     @NotNull
     @Override
     public <T> T[] toArray(@NotNull T[] ts) {
-        return CHANNELS.toArray(ts);
+        return CHANNELS.values().toArray(ts);
     }
 
     @Override
     public boolean add(Channel channel) {
-        boolean e = CHANNELS.add(channel);
+        CHANNELS.put(channel.name(), channel);
         this.markDirty();
-        return e;
+        return true;
     }
 
     @Override
     public boolean remove(Object o) {
-        boolean e = CHANNELS.remove(o);
+        boolean e = CHANNELS.values().remove(o);
         this.markDirty();
         return e;
     }
 
     @Override
     public boolean containsAll(@NotNull Collection<?> collection) {
-        return CHANNELS.containsAll(collection);
+        return CHANNELS.values().containsAll(collection);
     }
 
     @Override
     public boolean addAll(@NotNull Collection<? extends Channel> collection) {
-        boolean e = CHANNELS.addAll(collection);
+        for (Channel channel : collection) {
+            CHANNELS.put(channel.name(), channel);
+        }
         this.markDirty();
-        return e;
+        return true;
     }
 
     @Override
     public boolean removeAll(@NotNull Collection<?> collection) {
-        boolean e = CHANNELS.removeAll(collection);
+        boolean e = CHANNELS.values().removeAll(collection);
         this.markDirty();
         return e;
     }
 
     @Override
     public boolean retainAll(@NotNull Collection<?> collection) {
-        boolean e = CHANNELS.retainAll(collection);
+        boolean e = CHANNELS.values().retainAll(collection);
         this.markDirty();
         return e;
     }
 
     @Override
     public <T> T[] toArray(IntFunction<T[]> generator) {
-        return CHANNELS.toArray(generator);
+        return CHANNELS.values().toArray(generator);
     }
 
     @Override
     public boolean removeIf(Predicate<? super Channel> filter) {
-        boolean e = CHANNELS.removeIf(filter);
+        boolean e = CHANNELS.values().removeIf(filter);
         this.markDirty();
         return e;
     }
 
     @Override
     public Spliterator<Channel> spliterator() {
-        return CHANNELS.spliterator();
+        return CHANNELS.values().spliterator();
     }
 
     @Override
     public Stream<Channel> stream() {
-        return CHANNELS.stream();
+        return CHANNELS.values().stream();
     }
 
     @Override
     public Stream<Channel> parallelStream() {
-        return CHANNELS.parallelStream();
+        return CHANNELS.values().parallelStream();
     }
 
     /**

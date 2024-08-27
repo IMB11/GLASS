@@ -46,14 +46,11 @@ public class TerminalBlock extends BlockWithEntity {
 
         ChannelManagerPersistence persistence = ChannelManagerPersistence.get(world);
 
-        for (Channel channel : persistence.CHANNELS) {
-            if(channel.linkedBlock() != null) {
-                if(channel.linkedBlock().asLong() == pos.asLong()) {
-                    persistence.remove(channel);
-
-                    // Unlink if break.
-                    persistence.add(new Channel(channel.name(), null));
-                }
+        var iterator = persistence.CHANNELS.values().iterator();
+        while (iterator.hasNext()) {
+            Channel channel = iterator.next();
+            if (channel.linkedBlock() != null && channel.linkedBlock().asLong() == pos.asLong()) {
+                iterator.remove();
             }
         }
     }
