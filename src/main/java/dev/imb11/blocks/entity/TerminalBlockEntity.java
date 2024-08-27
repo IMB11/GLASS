@@ -41,8 +41,6 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
         channel = tag.getString("channel");
     }
 
-
-
     @Nullable
     @Override
     public Packet<ClientPlayPacketListener> toUpdatePacket() {

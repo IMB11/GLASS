@@ -110,6 +110,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         tag.putLong("deactiveSince", deactiveSince);
         tag.putInt("targetDistance", targetDistance);
 
+        if (this.portal != null) {
+            tag.putUuid("portal", this.portal.getUuid());
+        }
+
         super.writeNbt(tag);
     }
 
@@ -202,6 +206,13 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         deactiveSince = tag.getLong("deactiveSince");
         targetDistance = tag.getInt("targetDistance");
 
+        try {
+            if (!this.world.isClient) {
+                var serverWorld = (ServerWorld) this.world;
+                this.portal = (Portal) serverWorld.getEntity(tag.getUuid("portal"));
+            }
+        } catch (Exception ignored) {}
+
         super.readNbt(tag);
     }
 
@@ -287,14 +298,17 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             for (Direction direction : directionsToCheck) {
                 BlockPos neighborPos = pos.offset(direction);
                 if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
-                    visitedBlocks.add(neighborPos);
-                    Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
-                    map.add(neighborPair);
-                    queue.add(neighborPair);
+                    BlockPos facePos = neighborPos.offset(plane);
+                    if (world.getBlockState(facePos).isAir()) {
+                        visitedBlocks.add(neighborPos);
+                        Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
+                        map.add(neighborPair);
+                        queue.add(neighborPair);
 
-                    // Update furthestBlock accordingly
-                    if (currentDistance + 1 > furthestBlock) {
-                        furthestBlock = currentDistance + 1;
+                        // Update furthestBlock accordingly
+                        if (currentDistance + 1 > furthestBlock) {
+                            furthestBlock = currentDistance + 1;
+                        }
                     }
                 }
             }
