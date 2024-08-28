@@ -14,6 +14,8 @@ import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -69,11 +71,11 @@ public enum GPackets {
 
 
     private static void onTerminalChannelChanged(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
-        BlockPos pos = buf.readBlockPos();
+        GlobalPos pos = buf.readGlobalPos();
         String channel = buf.readString();
 
         server.executeSync(() -> {
-            var entity = player.getWorld().getBlockEntity(pos);
+            var entity = server.getWorld(pos.getDimension()).getBlockEntity(pos.getPos());
 
             if (entity instanceof TerminalBlockEntity terminal) {
                 terminal.channel = channel;
@@ -84,8 +86,9 @@ public enum GPackets {
                 AtomicReference<Channel> old = new AtomicReference<>();
 
                 channelManager.forEach(channel1 -> {
-                    if (channel1.linkedBlock() != null) {
-                        if (channel1.linkedBlock().asLong() == pos.asLong()) {
+                    if (channel1.linkedBlock() != null && channel1.dimension() != null) {
+                        if (channel1.linkedBlock().asLong() == pos.getPos().asLong() &&
+                                channel1.dimension() == pos.getDimension()) {
                             old.set(channel1);
                         }
                     }
@@ -94,22 +97,21 @@ public enum GPackets {
                 if (old.get() != null) {
                     Channel channel1 = old.get();
                     channelManager.remove(channel1);
-                    channelManager.add(channel1.removeLinkedBlock());
                 }
 
                 channelManager.removeIf(channels -> channels.name().equals(channel));
 
-                channelManager.add(new Channel(channel, pos));
+                channelManager.add(new Channel(channel, pos.getPos(), pos.getDimension()));
             }
         });
     }
 
     private static void onProjectorChannelChanged(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
-        BlockPos pos = buf.readBlockPos();
+        GlobalPos pos = buf.readGlobalPos();
         String channel = buf.readString();
 
         server.executeSync(() -> {
-            var entity = player.getWorld().getBlockEntity(pos);
+            var entity = server.getWorld(pos.getDimension()).getBlockEntity(pos.getPos());
 
             if (entity instanceof ProjectorBlockEntity projector) {
                 projector.channel = channel;
@@ -119,12 +121,12 @@ public enum GPackets {
     }
 
     private static void onRemoveLinkedChannel(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
-        BlockPos pos = buf.readBlockPos();
+        GlobalPos pos = buf.readGlobalPos();
 
         server.executeSync(() -> {
             var channelManager = ChannelManagerPersistence.get(player.getWorld());
 
-            var entity = player.getWorld().getBlockEntity(pos);
+            var entity = server.getWorld(pos.getDimension()).getBlockEntity(pos.getPos());
 
             String cachedChannel = "";
 
@@ -134,13 +136,10 @@ public enum GPackets {
                 terminal.markDirty();
             }
 
-            channelManager.removeIf(channels -> {
-                if (channels.linkedBlock() != null) {
-                    return channels.linkedBlock().asLong() == pos.asLong();
-                }
-                return false;
-            });
-            channelManager.add(new Channel(cachedChannel, null));
+            channelManager.removeIf(channel -> channel.linkedBlock() != null && channel.dimension() != null &&
+                    channel.linkedBlock().asLong() == pos.getPos().asLong() &&
+                    channel.dimension() == pos.getDimension());
+            channelManager.add(new Channel(cachedChannel, null, player.getWorld().getRegistryKey()));
 
         });
     }
@@ -148,9 +147,11 @@ public enum GPackets {
     private static void onPopulateDefaultChannel(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
         var channelManager = ChannelManagerPersistence.get(player.getWorld());
 
-        if (channelManager.stream().anyMatch(channel -> channel.name().equals("Default"))) return;
+        if (channelManager.stream().anyMatch(channel -> channel.name().equals("Default"))) {
+            return;
+        }
 
-        channelManager.add(new Channel("Default", null));
+        channelManager.add(new Channel("Default", null, player.getWorld().getRegistryKey()));
     }
 
     private static void onDeleteChannel(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
@@ -166,6 +167,6 @@ public enum GPackets {
 
         var channelManager = ChannelManagerPersistence.get(player.getWorld());
 
-        channelManager.add(new Channel(channel, null));
+        channelManager.add(new Channel(channel, null, player.getWorld().getRegistryKey()));
     }
 }

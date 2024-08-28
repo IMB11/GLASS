@@ -1,11 +1,14 @@
 package dev.imb11.sync;
 
+import com.mojang.serialization.JsonOps;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.World;
 import org.apache.logging.log4j.LogManager;
@@ -37,11 +40,8 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
         NbtList channels = new NbtList();
 
         for (Channel channel : CHANNELS.values()) {
-            NbtCompound item = new NbtCompound();
-            item.putString("name", channel.name());
-            if (channel.linkedBlock() != null)
-                item.putIntArray("linked_pos", getIntArrayFromBlockPos(channel.linkedBlock()));
-            channels.add(item);
+            var result = Channel.CODEC.encodeStart(NbtOps.INSTANCE, channel);
+            result.resultOrPartial(LOGGER::warn).ifPresent(channels::add);
         }
 
         nbt.put("channels", channels);
@@ -71,12 +71,14 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
         NbtList channels = compound.getList("channels", NbtElement.COMPOUND_TYPE);
 
         for (int i = 0; i < channels.size(); i++) {
-            NbtCompound channel = channels.getCompound(i);
+            NbtCompound channelNbt = channels.getCompound(i);
 
-            @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : getFromIntArrayNBT("linked_pos", channel);
-            Channel channel1 = new Channel(channel.getString("name"), bpos);
-            persistence.CHANNELS.put(channel1.name(), channel1);
-            LOGGER.info("Loaded Channel: " + channel1);
+            Channel.CODEC.parse(NbtOps.INSTANCE, channelNbt)
+                    .resultOrPartial(LOGGER::warn)
+                    .ifPresent(channel -> {
+                        persistence.CHANNELS.put(channel.name(), channel);
+                        LOGGER.info("Loaded Channel: {}", channel);
+                    });
         }
 
         return persistence;

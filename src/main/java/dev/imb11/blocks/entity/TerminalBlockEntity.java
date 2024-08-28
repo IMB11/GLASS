@@ -20,6 +20,7 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
 import org.jetbrains.annotations.Nullable;
 
 public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
@@ -69,7 +70,7 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
 
         PacketByteBuf buf = PacketByteBufs.create();
 
-        buf.writeBlockPos(this.getPos());
+        buf.writeGlobalPos(GlobalPos.create(this.world.getRegistryKey(), this.getPos()));
 
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
 
@@ -80,7 +81,7 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
 
     @Override
     public void writeScreenOpeningData(ServerPlayerEntity player, PacketByteBuf buf) {
-        buf.writeBlockPos(this.getPos());
+        buf.writeGlobalPos(GlobalPos.create(this.world.getRegistryKey(), this.getPos()));
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
         buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
 

@@ -15,12 +15,15 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -42,7 +45,7 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         root.setInsets(Insets.ROOT_PANEL);
 
         AtomicReference<String> selectedChannel = new AtomicReference<>(buf.readString());
-        BlockPos pos = buf.readBlockPos();
+        GlobalPos pos = buf.readGlobalPos();
         NbtCompound nbt = buf.readNbt();
 
         ArrayList<Channel> channels = new ArrayList<>();
@@ -51,16 +54,16 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         NbtList _channels = nbt.getList("channels", NbtElement.COMPOUND_TYPE);
 
         for (int i = 0; i < _channels.size(); i++) {
-            NbtCompound channel = _channels.getCompound(i);
-            @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : ChannelManagerPersistence.getFromIntArrayNBT("linked_pos", channel);
-            Channel channel1 = new Channel(channel.getString("name"), bpos);
-            channels.add(channel1);
+            NbtCompound channelNbt = _channels.getCompound(i);
+            Channel.CODEC.parse(NbtOps.INSTANCE, channelNbt)
+                    .resultOrPartial(System.out::println) // TODO: Proper logging
+                    .ifPresent(channels::add);
         }
 
-        if(channels.size() == 0) {
+        if (channels.size() == 0) {
             ClientPlayNetworking.send(GPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
 
-            channels.add(new Channel("Default", null));
+            channels.add(new Channel("Default", null, World.OVERWORLD));
         }
 
         ArrayList<WButtonTooltip> channelButtons = new ArrayList<>();
@@ -69,7 +72,7 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
 
             btn.setOnClick(() -> {
                 PacketByteBuf bufe = PacketByteBufs.create();
-                bufe.writeBlockPos(pos);
+                bufe.writeGlobalPos(pos);
                 bufe.writeString(btn.getLabel().getString());
 
                 selectedChannel.set(btn.getLabel().getString());
@@ -85,13 +88,13 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
                 btn.setEnabled(false);
             });
 
-            if(Objects.equals(channel.name(), selectedChannel.get()) || channel.linkedBlock() == null) {
+            if (Objects.equals(channel.name(), selectedChannel.get()) || channel.linkedBlock() == null) {
                 btn.setEnabled(false);
             }
 
             btn.setLabel(Text.literal(channel.name()));
 
-            if(channel.linkedBlock() == null) {
+            if (channel.linkedBlock() == null) {
                 btn.setLabel(Text.literal(channel.name()).formatted(Formatting.DARK_RED, Formatting.ITALIC));
                 btn.setTooltip(Text.literal("Channel not linked to a terminal.").formatted(Formatting.RED));
             } else {
