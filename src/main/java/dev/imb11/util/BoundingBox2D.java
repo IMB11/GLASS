@@ -16,8 +16,8 @@ import java.util.HashMap;
 import static net.minecraft.util.math.Direction.*;
 
 public class BoundingBox2D {
-    private float min1, min2;
-    private float max1, max2;
+    public float min1, min2;
+    public float max1, max2;
     private final Direction facing;
     private final int fixedCoord;
     private final HashMap<Vec3d, Integer> distanceMap = new HashMap<>();

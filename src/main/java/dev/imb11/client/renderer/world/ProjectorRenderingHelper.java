@@ -36,7 +36,7 @@ public class ProjectorRenderingHelper {
                 matrices.push();
 
                 matrices.translate(relativePos.getX(), relativePos.getY(), relativePos.getZ());
-                Vec3d zFightFix = new Vec3d(0.001, 0.001, 0.001).multiply(Vec3d.of(direction.getVector()));
+                Vec3d zFightFix = new Vec3d(0.01, 0.01, 0.01).multiply(Vec3d.of(direction.getVector()));
                 matrices.translate(zFightFix.getX(), zFightFix.getY(), zFightFix.getZ());
 
                 Matrix4f positionMatrix = matrices.peek().getPositionMatrix();

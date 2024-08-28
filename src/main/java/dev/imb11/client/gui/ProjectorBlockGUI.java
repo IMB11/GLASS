@@ -16,10 +16,14 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -79,13 +83,13 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
                 btn.setEnabled(false);
             });
 
-            if(Objects.equals(channel.name(), selectedChannel.get()) || channel.linkedBlock() == null) {
+            if (Objects.equals(channel.name(), selectedChannel.get()) || channel.linkedBlock() == null) {
                 btn.setEnabled(false);
             }
 
             btn.setLabel(Text.literal(channel.name()));
 
-            if(channel.linkedBlock() == null) {
+            if (channel.linkedBlock() == null) {
                 btn.setLabel(Text.literal(channel.name()).formatted(Formatting.DARK_RED, Formatting.ITALIC));
                 btn.setTooltip(Text.literal("Channel not linked to a terminal.").formatted(Formatting.RED));
             } else {

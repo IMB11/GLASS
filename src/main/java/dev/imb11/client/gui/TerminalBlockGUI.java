@@ -15,10 +15,14 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.GlobalPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -30,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class TerminalBlockGUI extends SyncedGuiDescription {
     public static final ScreenHandlerType<TerminalBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new TerminalBlockGUI(syncId, inventory, (TerminalBlockEntity.ScreenHandlerData) data), TerminalBlockEntity.ScreenHandlerData.CODEC);
 
-    public BlockPos pos;
+    public GlobalPos pos;
 
     private static final int WIDTH = 7*18*2;
     private static final int HEIGHT = 6*18*2;
@@ -56,18 +60,22 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         NbtList _channels = nbt.getList("channels", NbtElement.COMPOUND_TYPE);
 
         for (int i = 0; i < _channels.size(); i++) {
-            NbtCompound channel = _channels.getCompound(i);
-            @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : ChannelManagerPersistence.getFromIntArrayNBT("linked_pos", channel);
-            Channel channel1 = new Channel(channel.getString("name"), bpos);
-            channels.add(channel1);
+            NbtCompound channelNbt = _channels.getCompound(i);
+            Channel.CODEC.parse(NbtOps.INSTANCE, channelNbt)
+                    .resultOrPartial(System.out::println) // TODO: Proper logging
+                    .ifPresent(channels::add);
         }
 
+        if (channels.size() == 0) {
+            ClientPlayNetworking.send(GPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
+
+            channels.add(new Channel("Default", null, World.OVERWORLD));
         if(channels.isEmpty()) {
             ClientPlayNetworking.send(new C2SPopulateDefaultChannelPacket());
             channels.add(new Channel("Default", null));
         }
 
-        Glass.LOGGER.info("[GUI-CHANNELS] {} [WORLD] {}", channels, world);
+        Glass.LOGGER.info("[GUI-CHANNELS] " + channels + " [WORLD] " + world);
 
         ArrayList<WButtonTooltip> channelButtons = new ArrayList<>();
 
@@ -82,10 +90,10 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 ClientPlayNetworking.send(new C2STerminalChannelChangedPacket(pos, btn.getLabel().getString()));
 
                 for (WButton channelButton : channelButtons) {
-                    if(!channelButton.isEnabled()) {
+                    if (!channelButton.isEnabled()) {
                         for (Channel channeles : channels) {
-                            if(Objects.equals(channel.name(), channelButton.getLabel().getString())) {
-                                if (channeles.linkedBlock() == null) {
+                            if (Objects.equals(channel.name(), channelButton.getLabel().getString())) {
+                                if (channeles.linkedBlock() == null || channeles.dimension() == null) {
                                     channelButton.setEnabled(true);
                                 }
                                 break;
@@ -101,11 +109,11 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 this.onClosed(playerInventory.player);
             });
 
-            if (channel.linkedBlock() != null) {
-                if (pos.asLong() == channel.linkedBlock().asLong()) {
+            if (channel.linkedBlock() != null && channel.dimension() != null) {
+                if (pos.getPos().asLong() == channel.linkedBlock().asLong() &&
+                        pos.getDimension() == channel.dimension()) {
                     btn.setEnabled(false);
-                }
-                else {
+                } else {
                     btn.setEnabled(false);
                     btn.setTooltip(Text.literal("Channel is being used by another terminal."), Text.literal(channel.linkedBlock().toShortString()).formatted(Formatting.GRAY, Formatting.ITALIC));
                 }
@@ -143,9 +151,9 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         unlinkChannelButton.setEnabled(false);
 
         for (Channel channel : channels) {
-            if(channel.linkedBlock() != null) {
-                if(channel.linkedBlock().asLong() == pos.asLong())
-                {
+            if (channel.linkedBlock() != null && channel.dimension() != null) {
+                if (channel.linkedBlock().asLong() == pos.getPos().asLong() &&
+                        channel.dimension() == pos.getDimension()) {
                     unlinkChannelButton.setEnabled(true);
                     break;
                 }
@@ -162,7 +170,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         WButton addChannel = new WButton();
         addChannel.setOnClick(() -> {
             String val = channelNameBoxValue.get();
-            if(val.isBlank()) {
+            if (val.isBlank()) {
                 addChannel.setLabel(Text.literal("Invalid Channel Name").formatted(Formatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
@@ -172,7 +180,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 }, 1000);
             } else {
 
-                channels.add(new Channel(channelNameBoxValue.get(), null));
+                channels.add(new Channel(channelNameBoxValue.get(), null, World.OVERWORLD));
 
                 ClientPlayNetworking.send(new C2SCreateChannelPacket(channelNameBoxValue.get()));
 

@@ -1,14 +1,14 @@
 {
     "schemaVersion": 1,
-    "id": "glassier",
+    "id": "glass",
     "version": "${version}",
-    "name": "GLASSIER",
-    "description": "General Laymans Aesthetic Spying Screen Is Epicly Remastered",
+    "name": "GLASS Remastered",
+    "description": "General Laymans Aesthetic Spying Screen Remaster for 1.21+",
     "authors": [],
     "contact": {},
     "license": "All-Rights-Reserved",
-    "icon": "assets/glassier/icon.png",
-    "accessWidener": "glassier.accesswidener",
+    "icon": "assets/glass/icon.png",
+    "accessWidener": "glass.accesswidener",
     "environment": "*",
     "entrypoints": {
         "client": [
@@ -19,7 +19,7 @@
         ]
     },
     "mixins": [
-        "glassier.mixins.json"
+        "glass.mixins.json"
     ],
     "depends": {
         "fabricloader": ">=${loader_version}",
