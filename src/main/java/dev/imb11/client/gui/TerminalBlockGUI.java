@@ -1,6 +1,7 @@
 package dev.imb11.client.gui;
 
 import dev.imb11.Glass;
+import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GPackets;
@@ -9,12 +10,14 @@ import io.github.cottonmc.cotton.gui.widget.*;
 import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.fabricmc.fabric.api.screenhandler.v1.ScreenHandlerRegistry;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -29,7 +32,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class TerminalBlockGUI extends SyncedGuiDescription {
-    public static final ScreenHandlerType<TerminalBlockGUI> SCREEN_HANDLER_TYPE = ScreenHandlerRegistry.registerExtended(new Identifier("glass", "terminal_screen"), TerminalBlockGUI::new);
+    public static final ScreenHandlerType<TerminalBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new TerminalBlockGUI(syncId, inventory, (TerminalBlockEntity.ScreenHandlerData) data), TerminalBlockEntity.ScreenHandlerData.CODEC);
 
     public BlockPos pos;
 
@@ -38,7 +41,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
     private WButton unlinkChannelButton;
 
-    public TerminalBlockGUI(int syncId, PlayerInventory playerInventory, PacketByteBuf context) {
+    public TerminalBlockGUI(int syncId, PlayerInventory playerInventory, TerminalBlockEntity.ScreenHandlerData context) {
         super(SCREEN_HANDLER_TYPE, syncId, playerInventory);
 
         WPlainPanel root = new WPlainPanel();
@@ -47,9 +50,9 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         root.setSize(WIDTH, HEIGHT);
         root.setInsets(Insets.ROOT_PANEL);
 
-        pos = context.readBlockPos();
+        pos = context.pos();
 
-        NbtCompound nbt = context.readNbt();
+        NbtCompound nbt = context.channelManagerNbt();
 
         ArrayList<Channel> channels = new ArrayList<>();
 

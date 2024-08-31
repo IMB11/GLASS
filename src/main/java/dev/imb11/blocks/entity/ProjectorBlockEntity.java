@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.GlassBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.Entity;
@@ -19,6 +18,9 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -100,7 +102,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     @Override
-    public void writeNbt(NbtCompound tag) {
+    public void writeNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
         tag.putFloat("rotationBeacon", rotationBeacon);
         tag.putFloat("rotationBeaconPrev", rotationBeaconPrev);
         tag.putString("channel", channel);
@@ -114,7 +116,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             tag.putUuid("portal", this.portal.getUuid());
         }
 
-        super.writeNbt(tag);
+        super.writeNbt(tag, registryLookup);
     }
 
     public void createPortal(ServerWorld world) {
@@ -158,7 +160,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             return;
         }
 
-        Portal portal = Portal.entityType.create(world);
+        Portal portal = Portal.ENTITY_TYPE.create(world);
+
         portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
 
         Vec3d offset = switch (facing.getOpposite()) {
@@ -208,7 +211,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     @Override
-    public void readNbt(NbtCompound tag) {
+    public void readNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
         channel = tag.getString("channel");
         rotationBeacon = tag.getFloat("rotationBeacon");
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
@@ -225,7 +228,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             }
         } catch (Exception ignored) {}
 
-        super.readNbt(tag);
+        super.readNbt(tag, registryLookup);
     }
 
     @Override
@@ -245,12 +248,21 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         return new ProjectorBlockGUI(syncId, inventory, buf);
     }
 
+    public record ScreenHandlerData(String channel, BlockPos pos, NbtCompound compound) {
+        public static final PacketCodec<RegistryByteBuf, ScreenHandlerData> CODEC = PacketCodec.ofStatic(
+                (buf, instance) -> {
+                    buf.writeString(instance.channel);
+                    buf.writeBlockPos(instance.pos);
+                    buf.writeNbt(instance.compound);
+                },
+                (buf) -> new ScreenHandlerData(buf.readString(), buf.readBlockPos(), buf.readNbt())
+        );
+    }
+
     @Override
-    public void writeScreenOpeningData(ServerPlayerEntity player, PacketByteBuf buf) {
+    public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        buf.writeString(channel);
-        buf.writeBlockPos(pos);
-        buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
+        return new ScreenHandlerData(channel, pos, channelManager.writeNbt(new NbtCompound()));
     }
 
     public void tick(World world) {
@@ -262,7 +274,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 visitedBlocks.clear();
                 neighbouringGlassBlocks.add(new Pair<>(pos, 0));
                 visitedBlocks.add(pos);
-                checkNeighbors(facing, neighbouringGlassBlocks, 0, pos, world);
+                checkNeighbors(facing, neighbouringGlassBlocks, pos, world);
 
                 if (!world.isClient) {
                     createPortal((ServerWorld) world);
@@ -295,11 +307,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
     }
 
-    private void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, int distanceFromRoot, BlockPos currentPos, World world) {
+    private void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, BlockPos currentPos, World world) {
         Direction[] directionsToCheck = getDirections(plane);
         Queue<Pair<BlockPos, Integer>> queue = new LinkedList<>();
         Set<BlockPos> visitedBlocks = new HashSet<>(); // Ensure you have a Set to track visited blocks
-        queue.add(new Pair<>(currentPos, distanceFromRoot));
+        queue.add(new Pair<>(currentPos, 0));
         visitedBlocks.add(currentPos);
 
         while (!queue.isEmpty()) {
@@ -309,7 +321,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
             for (Direction direction : directionsToCheck) {
                 BlockPos neighborPos = pos.offset(direction);
-                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock() instanceof GlassBlock) {
+                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock().getRegistryEntry().registryKey().getValue().equals("minecraft:glass")) {
                     visitedBlocks.add(neighborPos);
                     Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
                     map.add(neighborPair);

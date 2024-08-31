@@ -13,6 +13,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
@@ -78,12 +80,23 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
         return new TerminalBlockGUI(syncId, inventory, buf);
     }
 
-    @Override
-    public void writeScreenOpeningData(ServerPlayerEntity player, PacketByteBuf buf) {
-        buf.writeBlockPos(this.getPos());
-        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
+    public record ScreenHandlerData(BlockPos pos, NbtCompound channelManagerNbt) {
+        public static final PacketCodec<RegistryByteBuf, ScreenHandlerData> CODEC = PacketCodec.ofStatic(
+                (buf, instance) -> {
+                    buf.writeBlockPos(instance.pos());
+                    buf.writeNbt(instance.channelManagerNbt());
+                },
+                (buf) -> {
+                    BlockPos pos = buf.readBlockPos();
+                    NbtCompound channelManagerNbt = buf.readNbt();
+                    return new ScreenHandlerData(pos, channelManagerNbt);
+                }
+        );
+    }
 
-        System.out.println(channelManager.writeNbt(new NbtCompound()));
+    @Override
+    public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
+        return new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound()));
     }
 }

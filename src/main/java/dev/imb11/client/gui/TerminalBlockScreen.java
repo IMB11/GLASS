@@ -8,4 +8,9 @@ public class TerminalBlockScreen extends CottonInventoryScreen<TerminalBlockGUI>
     public TerminalBlockScreen(TerminalBlockGUI gui, PlayerEntity player, Text title) {
         super(gui, player, title);
     }
+
+    @Override
+    public boolean keyPressed(int ch, int keyCode, int modifiers) {
+        return super.keyPressed(ch, keyCode, modifiers);
+    }
 }
