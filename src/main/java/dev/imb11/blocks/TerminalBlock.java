@@ -1,5 +1,6 @@
 package dev.imb11.blocks;
 
+import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
@@ -15,7 +16,6 @@ import net.minecraft.state.StateManager;
 import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -24,6 +24,11 @@ import org.jetbrains.annotations.Nullable;
 public class TerminalBlock extends BlockWithEntity {
     public TerminalBlock(Settings settings) {
         super(settings);
+    }
+
+    @Override
+    protected MapCodec<? extends BlockWithEntity> getCodec() {
+        return null;
     }
 
     public static final DirectionProperty FACING = Properties.FACING;
@@ -38,12 +43,14 @@ public class TerminalBlock extends BlockWithEntity {
         return new TerminalBlockEntity(pos, state);
     }
 
+
+
     @Override
-    public void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
+    public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
         super.onBreak(world, pos, state, player);
 
         if (world.isClient) {
-            return;
+            return state;
         }
 
         ChannelManagerPersistence persistence = ChannelManagerPersistence.get(world);
@@ -55,10 +62,11 @@ public class TerminalBlock extends BlockWithEntity {
                 iterator.remove();
             }
         }
+        return state;
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
+    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
         // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
         // such as the one from BlockWithEntity
 

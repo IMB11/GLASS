@@ -64,10 +64,7 @@ dependencies {
 
     modImplementation include("io.github.cottonmc:LibGui:${project.libgui_version}")
 
-    // YOU WILL NEED TO PUBLISH TO LOCAL MAVEN TO USE THIS
-    modImplementation include("qouteall:ImmersivePortalsMod:6.0.0") {
-        exclude(group: "org.lwjgl")
-    }
+    modImplementation include("com.github.iPortalTeam:ImmersivePortalsMod:v6.0.3-mc1.21.1")
 
 //    modImplementation include("com.github.iPortalTeam.ImmersivePortalsMod:q_misc_util:v6.0.0-mc1.21.1") {
 //        // exclude org.lwjg

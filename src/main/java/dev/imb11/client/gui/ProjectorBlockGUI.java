@@ -1,25 +1,24 @@
 package dev.imb11.client.gui;
 
+import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
-import dev.imb11.sync.GPackets;
+import dev.imb11.sync.packets.C2SPopulateDefaultChannelPacket;
+import dev.imb11.sync.packets.C2SProjectorChannelChangedPacket;
 import io.github.cottonmc.cotton.gui.SyncedGuiDescription;
 import io.github.cottonmc.cotton.gui.widget.WButton;
 import io.github.cottonmc.cotton.gui.widget.WListPanel;
 import io.github.cottonmc.cotton.gui.widget.WPlainPanel;
 import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.screenhandler.v1.ScreenHandlerRegistry;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,11 +27,11 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ProjectorBlockGUI extends SyncedGuiDescription {
-    public static final ScreenHandlerType<ProjectorBlockGUI> SCREEN_HANDLER_TYPE = ScreenHandlerRegistry.registerExtended(new Identifier("glass", "projector_screen"), ProjectorBlockGUI::new);
+    public static final ScreenHandlerType<ProjectorBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new ProjectorBlockGUI(syncId, inventory, (ProjectorBlockEntity.ScreenHandlerData) data), ProjectorBlockEntity.ScreenHandlerData.CODEC);
 
     private static final int WIDTH = 7*18*2;
     private static final int HEIGHT = 6*18*2;
-    public ProjectorBlockGUI(int syncId, PlayerInventory playerInventory, PacketByteBuf buf) {
+    public ProjectorBlockGUI(int syncId, PlayerInventory playerInventory, ProjectorBlockEntity.ScreenHandlerData data) {
         super(SCREEN_HANDLER_TYPE, syncId, playerInventory);
 
         WPlainPanel root = new WPlainPanel();
@@ -41,9 +40,9 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         root.setSize(WIDTH, HEIGHT);
         root.setInsets(Insets.ROOT_PANEL);
 
-        AtomicReference<String> selectedChannel = new AtomicReference<>(buf.readString());
-        BlockPos pos = buf.readBlockPos();
-        NbtCompound nbt = buf.readNbt();
+        AtomicReference<String> selectedChannel = new AtomicReference<>(data.channel());
+        BlockPos pos = data.pos();
+        NbtCompound nbt = data.compound();
 
         ArrayList<Channel> channels = new ArrayList<>();
 
@@ -58,8 +57,7 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         }
 
         if(channels.size() == 0) {
-            ClientPlayNetworking.send(GPackets.POPULATE_DEFAULT_CHANNEL.ID, PacketByteBufs.empty());
-
+            ClientPlayNetworking.send(new C2SPopulateDefaultChannelPacket());
             channels.add(new Channel("Default", null));
         }
 
@@ -68,13 +66,9 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
         WListPanel<Channel, WButtonTooltip> channelList = new WListPanel<>(channels, WButtonTooltip::new, (Channel channel, WButtonTooltip btn) -> {
 
             btn.setOnClick(() -> {
-                PacketByteBuf bufe = PacketByteBufs.create();
-                bufe.writeBlockPos(pos);
-                bufe.writeString(btn.getLabel().getString());
-
                 selectedChannel.set(btn.getLabel().getString());
 
-                ClientPlayNetworking.send(GPackets.PROJECTOR_CHANNEL_CHANGED.ID, bufe);
+                ClientPlayNetworking.send(new C2SProjectorChannelChangedPacket(pos, btn.getLabel().getString()));
 
                 for (WButton channelButton : channelButtons) {
                     if(!channelButton.isEnabled()) {

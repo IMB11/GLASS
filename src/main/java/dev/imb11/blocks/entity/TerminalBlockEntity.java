@@ -18,6 +18,7 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -34,12 +35,12 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
     }
 
     @Override
-    public void writeNbt(NbtCompound tag) {
+    public void writeNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
         tag.putString("channel", channel);
     }
 
     @Override
-    public void readNbt(NbtCompound tag) {
+    public void readNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
         channel = tag.getString("channel");
     }
 
@@ -50,10 +51,9 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt() {
-        return createNbt();
+    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup lookup) {
+        return createNbt(lookup);
     }
-
 
     @Override
     public BlockEntityType<?> getType() {
@@ -68,16 +68,8 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
 
     @Override
     public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-
-        PacketByteBuf buf = PacketByteBufs.create();
-
-        buf.writeBlockPos(this.getPos());
-
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-
-        buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
-
-        return new TerminalBlockGUI(syncId, inventory, buf);
+        return new TerminalBlockGUI(syncId, inventory, new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound(), null)));
     }
 
     public record ScreenHandlerData(BlockPos pos, NbtCompound channelManagerNbt) {
@@ -97,6 +89,6 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
     @Override
     public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        return new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound()));
+        return new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound(), null));
     }
 }

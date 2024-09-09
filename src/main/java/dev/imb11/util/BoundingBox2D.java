@@ -5,6 +5,10 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import qouteall.imm_ptl.core.portal.GeometryPortalShape;
 import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.imm_ptl.core.portal.shape.BoxPortalShape;
+import qouteall.imm_ptl.core.portal.shape.PortalShape;
+import qouteall.imm_ptl.core.portal.shape.SpecialFlatPortalShape;
+import qouteall.q_misc_util.my_util.Mesh2D;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +35,7 @@ public class BoundingBox2D {
     }
 
     public void addSquares(BlockPos projectorPos, Portal portal, int targetDistance, boolean flip) {
-        portal.specialShape = new GeometryPortalShape();
+        var shape = new Mesh2D();
         for (var entry : new ArrayList<>(distanceMap.entrySet()) {{
             this.add(new HashMap.SimpleEntry<>(Vec3d.of(projectorPos), 0));
         }}) {
@@ -57,15 +61,17 @@ public class BoundingBox2D {
             }
 
             if (distance <= targetDistance) {
-                portal.specialShape.addTriangleForRectangle(x, y, x + 1, y + 1);
+               shape.addQuad(x, y, x + 1, y + 1);
             }
         }
 
-        portal.specialShape.normalize(this.getWidth(), this.getHeight());
+        var specialShape = new SpecialFlatPortalShape(shape);
 
         if (flip) {
-            portal.specialShape = portal.specialShape.getFlippedWithScaling(1.0f);
+            specialShape = (SpecialFlatPortalShape) specialShape.getFlipped();
         }
+
+        portal.setPortalShape(specialShape);
     }
 
     public BoundingBox2D(BlockPos initialPos, Direction direction) {

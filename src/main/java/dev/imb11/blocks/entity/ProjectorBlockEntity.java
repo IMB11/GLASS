@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.Entity;
@@ -150,7 +151,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             }
         }
 
-        Glass.LOGGER.info("Bounding box: " + boundingBox);
+        Glass.LOGGER.info("Bounding box: {}", boundingBox);
 
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(world);
         Channel channel = channelManager.CHANNELS.get(this.channel);
@@ -238,14 +239,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-        PacketByteBuf buf = PacketByteBufs.create();
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
 
-        buf.writeString(channel);
-        buf.writeBlockPos(pos);
-        buf.writeNbt(channelManager.writeNbt(new NbtCompound()));
-
-        return new ProjectorBlockGUI(syncId, inventory, buf);
+        return new ProjectorBlockGUI(syncId, inventory, new ScreenHandlerData(channel, this.getPos(), channelManager.writeNbt(new NbtCompound(), null)));
     }
 
     public record ScreenHandlerData(String channel, BlockPos pos, NbtCompound compound) {
@@ -262,7 +258,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     @Override
     public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        return new ScreenHandlerData(channel, pos, channelManager.writeNbt(new NbtCompound()));
+        return new ScreenHandlerData(channel, pos, channelManager.writeNbt(new NbtCompound(), null));
     }
 
     public void tick(World world) {
@@ -321,7 +317,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
             for (Direction direction : directionsToCheck) {
                 BlockPos neighborPos = pos.offset(direction);
-                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock().getRegistryEntry().registryKey().getValue().equals("minecraft:glass")) {
+                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock().equals(Blocks.GLASS)) {
                     visitedBlocks.add(neighborPos);
                     Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
                     map.add(neighborPair);

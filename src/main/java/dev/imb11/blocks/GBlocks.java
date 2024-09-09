@@ -2,6 +2,8 @@ package dev.imb11.blocks;
 
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
+import dev.imb11.client.gui.ProjectorBlockGUI;
+import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.block.TerminalBlockEntityRenderer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
@@ -24,9 +26,12 @@ public class GBlocks {
         register("projector", PROJECTOR);
 //        register("projection_panel", PROJECTION_PANEL);
 
-        Registry.register(Registries.BLOCK_ENTITY_TYPE, new Identifier("glass", "terminal_entity"), TerminalBlockEntity.BLOCK_ENTITY_TYPE);
-        Registry.register(Registries.BLOCK_ENTITY_TYPE, new Identifier("glass", "projector_entity"), ProjectorBlockEntity.BLOCK_ENTITY_TYPE);
-//        Registry.register(Registries.BLOCK_ENTITY_TYPE, new Identifier("glass", "projection_entity"), ProjectionBlockBase.BLOCK_ENTITY_TYPE);
+        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "terminal_entity"), TerminalBlockEntity.BLOCK_ENTITY_TYPE);
+        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "projector_entity"), ProjectorBlockEntity.BLOCK_ENTITY_TYPE);
+//        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "projection_entity"), ProjectionBlockBase.BLOCK_ENTITY_TYPE);
+
+        Registry.register(Registries.SCREEN_HANDLER, Identifier.of("glass", "terminal_gui"), TerminalBlockGUI.SCREEN_HANDLER_TYPE);
+        Registry.register(Registries.SCREEN_HANDLER, Identifier.of("glass", "projector_gui"), ProjectorBlockGUI.SCREEN_HANDLER_TYPE);
     }
 
     public static void initClient() {
@@ -37,6 +42,6 @@ public class GBlocks {
     }
 
     private static <T extends Block> T register(String id, T block) {
-        return Registry.register(Registries.BLOCK, new Identifier("glass", id), block);
+        return Registry.register(Registries.BLOCK, Identifier.of("glass", id), block);
     }
 }

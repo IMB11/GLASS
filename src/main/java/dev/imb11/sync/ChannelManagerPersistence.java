@@ -1,9 +1,11 @@
 package dev.imb11.sync;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.PersistentState;
@@ -18,13 +20,11 @@ import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-/**
- * @deprecated DO NOT USE IN CLIENT SITUATIONS WITH CLIENTWORLD, ALWAYS USE SERVERWORLD
- */
 public class ChannelManagerPersistence extends PersistentState implements Collection<Channel> {
+    public static PersistentState.Type<ChannelManagerPersistence> TYPE = new PersistentState.Type<ChannelManagerPersistence>(ChannelManagerPersistence::new, ChannelManagerPersistence::gather, null);
 
     public static ChannelManagerPersistence get(World world) {
-        return (ChannelManagerPersistence) ((ServerWorld) world).getPersistentStateManager().get(ChannelManagerPersistence::gather, "glass_channels");
+        return (ChannelManagerPersistence) ((ServerWorld) world).getPersistentStateManager().get(TYPE, "glass_channels");
     }
 
     private static final Logger LOGGER = LogManager.getLogger("ChannelManagerPersistence");
@@ -32,8 +32,7 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
     public final Map<String, Channel> CHANNELS = new HashMap<>();
 
     @Override
-    public NbtCompound writeNbt(NbtCompound nbt) {
-
+    public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         NbtList channels = new NbtList();
 
         for (Channel channel : CHANNELS.values()) {
@@ -64,8 +63,7 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
         return new BlockPos(ints[0], ints[1], ints[2]);
     }
 
-    public static PersistentState gather(NbtCompound compound) {
-
+    public static ChannelManagerPersistence gather(NbtCompound compound, RegistryWrapper.WrapperLookup registryLookup) {
         ChannelManagerPersistence persistence = new ChannelManagerPersistence();
 
         NbtList channels = compound.getList("channels", NbtElement.COMPOUND_TYPE);
@@ -84,8 +82,8 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
 
     public static void init() {
         ServerWorldEvents.LOAD.register((server, world) -> {
-            PersistentState state = world.getPersistentStateManager().getOrCreate(ChannelManagerPersistence::gather, ChannelManagerPersistence::new, "glass_channels");
-            LOGGER.info("Loaded ChannelManagerPersistence for: " + world.getDimensionKey().getValue() + " at " + world);
+            PersistentState state = world.getPersistentStateManager().getOrCreate(TYPE, "glass_channels");
+            LOGGER.info("Loaded ChannelManagerPersistence for: " + world.getRegistryKey().getValue() + " at " + world);
         });
     }
 
