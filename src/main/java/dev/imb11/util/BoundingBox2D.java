@@ -60,8 +60,17 @@ public class BoundingBox2D {
                 }
             }
 
+            double x2 = x + 1;
+            double y2 = y + 1;
+
+            // Normalize the coordinates from -1 to 1
+            x = x / (getWidth() / 2);
+            y = y / (getHeight() / 2);
+            x2 = x2 / (getWidth() / 2);
+            y2 = y2 / (getHeight() / 2);
+
             if (distance <= targetDistance) {
-               shape.addQuad(x, y, x + 1, y + 1);
+               shape.addQuad(x, y, x2, y2);
             }
         }
 
