@@ -23,7 +23,6 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.GlobalPos;
 import org.jetbrains.annotations.Nullable;
 
 public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {

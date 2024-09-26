@@ -29,7 +29,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.GlobalPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
@@ -157,14 +156,14 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(world);
         Channel channel = channelManager.CHANNELS.get(this.channel);
 
-        if (channel == null || channel.linkedBlock() == null || channel.dimension() == null) {
+        if (channel == null || channel.linkedBlock() == null) {
             Glass.LOGGER.error("This projector is not linked to a valid channel!");
             return;
         }
 
         Portal portal = Portal.ENTITY_TYPE.create(world);
 
-        portal.setDestinationDimension(channel.dimension()); // TODO: Use GlobalPos
+        portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
 
         Vec3d offset = switch (facing.getOpposite()) {
             case NORTH -> new Vec3d(0, 0, -1);
@@ -240,7 +239,6 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-        PacketByteBuf buf = PacketByteBufs.create();
         ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
 
         return new ProjectorBlockGUI(syncId, inventory, new ScreenHandlerData(channel, this.getPos(), channelManager.writeNbt(new NbtCompound(), null)));
