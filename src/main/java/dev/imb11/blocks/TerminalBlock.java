@@ -1,5 +1,6 @@
 package dev.imb11.blocks;
 
+import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
@@ -24,6 +25,11 @@ import org.jetbrains.annotations.Nullable;
 public class TerminalBlock extends BlockWithEntity {
     public TerminalBlock(Settings settings) {
         super(settings);
+    }
+
+    @Override
+    protected MapCodec<? extends BlockWithEntity> getCodec() {
+        return null;
     }
 
     public static final DirectionProperty FACING = Properties.FACING;
