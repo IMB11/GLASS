@@ -58,8 +58,7 @@ public class TerminalBlock extends BlockWithEntity {
         var iterator = persistence.CHANNELS.values().iterator();
         while (iterator.hasNext()) {
             Channel channel = iterator.next();
-            if (channel.linkedBlock() != null && channel.linkedBlock().asLong() != pos.asLong() &&
-                    channel.dimension() != null && channel.dimension() != world.getRegistryKey()) {
+            if (channel.linkedBlock() != null && channel.linkedBlock().asLong() != pos.asLong()) {
                 iterator.remove();
             }
         }
