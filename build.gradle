@@ -50,7 +50,7 @@ repositories {
 }
 
 loom {
-    accessWidenerPath = file('src/main/resources/glassier.accesswidener')
+    accessWidenerPath = file('src/main/resources/glass.accesswidener')
 }
 
 dependencies {
