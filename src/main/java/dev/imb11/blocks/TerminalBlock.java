@@ -27,7 +27,6 @@ public class TerminalBlock extends BlockWithEntity {
         super(settings);
     }
 
-    @Override
     protected MapCodec<? extends BlockWithEntity> getCodec() {
         return null;
     }
