@@ -3,6 +3,7 @@ package dev.imb11.blocks.entity;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
+import dev.imb11.projection.ProjectionSurface;
 import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
@@ -14,7 +15,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -23,70 +23,37 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.*;
+import org.jetbrains.annotations.Nullable;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
-    public static int FADEOUT_TIME_MAX = 12;
+    public static final int FADEOUT_TIME_MAX = 12;
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
-    public final ArrayList<Tuple<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
-    private final Set<BlockPos> visitedBlocks = new HashSet<>();
     public int fadeoutTime = 12;
     public boolean active = false;
-    public long activeSince = -1;
     public String channel = "";
-
-    public int targetDistance = 0;
-    public long deactiveSince = -1;
     public float rotationBeacon, rotationBeaconPrev;
-    public int furthestBlock = 0;
+
+    private ProjectionSurface projectionSurface;
+    private long projectionSurfaceVersion;
+    private int revealDistance = -1;
 
     public ProjectorBlockEntity(BlockPos pos, BlockState state) {
         super(BLOCK_ENTITY_TYPE, pos, state);
     }
 
-    private static Direction @NotNull [] getDirections(Direction plane) {
-        Direction[] directionsToCheck;
-        if (plane == Direction.UP || plane == Direction.DOWN) {
-            directionsToCheck = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-        } else if (plane == Direction.NORTH || plane == Direction.SOUTH) {
-            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.EAST, Direction.WEST};
-        } else {
-            directionsToCheck = new Direction[]{Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH};
-        }
-        return directionsToCheck;
-    }
-
     public static void tick(Level world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
-        be.tick(world);
-
+        be.tickFadeout();
+        boolean wasActive = be.active;
         be.active = world.hasNeighborSignal(pos);
+        if (!wasActive && be.active) {
+            be.revealDistance = -1;
+        }
         float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
         if (rotationFactor > 0) {
             be.rotationBeacon += 20F * rotationFactor;
         }
         be.rotationBeaconPrev = be.rotationBeacon;
-
-        if (be.active && be.activeSince != -1) {
-            long activeSince = be.activeSince;
-            be.deactiveSince = -1;
-
-            int maxDistance = be.furthestBlock + 3;
-            be.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
-            be.setChanged();
-        } else {
-            if (be.deactiveSince == -1) {
-                be.deactiveSince = System.currentTimeMillis();
-                be.setChanged();
-            }
-
-            if (be.targetDistance > -1 && System.currentTimeMillis() - be.deactiveSince > 25L) {
-                be.targetDistance--;
-                be.deactiveSince = System.currentTimeMillis();
-                be.setChanged();
-            }
-        }
+        be.tickProjection(world);
     }
 
     @Override
@@ -96,9 +63,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         tag.putString("channel", channel);
         tag.putBoolean("active", active);
         tag.putInt("fadeoutTime", fadeoutTime);
-        tag.putLong("activeSince", activeSince);
-        tag.putLong("deactiveSince", deactiveSince);
-        tag.putInt("targetDistance", targetDistance);
+        tag.putInt("targetDistance", revealDistance);
+        tag.putLong("projectionSurfaceVersion", projectionSurfaceVersion);
 
         super.saveAdditional(tag, registryLookup);
     }
@@ -110,9 +76,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
         active = tag.getBoolean("active");
         fadeoutTime = tag.getInt("fadeoutTime");
-        activeSince = tag.getLong("activeSince");
-        deactiveSince = tag.getLong("deactiveSince");
-        targetDistance = tag.getInt("targetDistance");
+        revealDistance = tag.contains("targetDistance") ? tag.getInt("targetDistance") : -1;
+        projectionSurfaceVersion = Math.max(0L, tag.getLong("projectionSurfaceVersion"));
 
         super.loadAdditional(tag, registryLookup);
     }
@@ -146,23 +111,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         return new ScreenHandlerData(channel, worldPosition, channelManager.save(new CompoundTag(), null));
     }
 
-    public void tick(Level world) {
-        Direction facing = this.getBlockState().getValue(ProjectorBlock.FACING);
+    private void tickFadeout() {
         if (active) {
-            if (activeSince == -1) {
-                activeSince = System.currentTimeMillis();
-                neighbouringGlassBlocks.clear();
-                visitedBlocks.clear();
-                neighbouringGlassBlocks.add(new Tuple<>(worldPosition, 0));
-                visitedBlocks.add(worldPosition);
-                checkNeighbors(facing, neighbouringGlassBlocks, worldPosition, world);
-
-            }
-
             fadeoutTime = FADEOUT_TIME_MAX;
         } else {
-            activeSince = -1;
-
             if (fadeoutTime > 0) {
                 fadeoutTime--;
             } else {
@@ -171,31 +123,67 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
     }
 
-    private void checkNeighbors(Direction plane, ArrayList<Tuple<BlockPos, Integer>> map, BlockPos currentPos, Level world) {
-        Direction[] directionsToCheck = getDirections(plane);
-        Queue<Tuple<BlockPos, Integer>> queue = new LinkedList<>();
-        Set<BlockPos> visitedBlocks = new HashSet<>();
-        queue.add(new Tuple<>(currentPos, 0));
-        visitedBlocks.add(currentPos);
-
-        while (!queue.isEmpty()) {
-            Tuple<BlockPos, Integer> current = queue.poll();
-            BlockPos pos = current.getA();
-            int currentDistance = current.getB();
-
-            for (Direction direction : directionsToCheck) {
-                BlockPos neighborPos = pos.relative(direction);
-                if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock().equals(Blocks.GLASS)) {
-                    visitedBlocks.add(neighborPos);
-                    Tuple<BlockPos, Integer> neighborPair = new Tuple<>(neighborPos, currentDistance + 1);
-                    map.add(neighborPair);
-                    queue.add(neighborPair);
-
-                    if (currentDistance + 1 > furthestBlock) {
-                        furthestBlock = currentDistance + 1;
-                    }
-                }
-            }
+    private void tickProjection(Level world) {
+        if (!active && revealDistance < 0) {
+            return;
         }
+        Direction facing = getBlockState().getValue(ProjectorBlock.FACING);
+        ensureProjectionSurface(world, facing);
+        int oldRevealDistance = revealDistance;
+        if (active) {
+            revealDistance = Math.min(projectionSurface.completedRevealDistance(), revealDistance + 1);
+        } else {
+            revealDistance = Math.max(-1, revealDistance - 1);
+        }
+        if (revealDistance != oldRevealDistance) {
+            setChanged();
+        }
+    }
+
+    private void ensureProjectionSurface(Level world, Direction facing) {
+        boolean facingChanged = projectionSurface != null && projectionSurface.facing() != facing;
+        if (projectionSurface != null && projectionSurface.isTopologyValid(facing, position -> world.getBlockState(position).is(Blocks.GLASS))) {
+            return;
+        }
+
+        long nextVersion = Math.incrementExact(projectionSurfaceVersion);
+        ProjectionSurface rebuilt = ProjectionSurface.rebuild(
+                worldPosition,
+                facing,
+                nextVersion,
+                position -> world.getBlockState(position).is(Blocks.GLASS)
+        );
+        if (projectionSurface != null
+                && projectionSurface.facing() == rebuilt.facing()
+                && projectionSurface.topologyHash() == rebuilt.topologyHash()
+                && projectionSurface.cells().equals(rebuilt.cells())) {
+            return;
+        }
+
+        projectionSurface = rebuilt;
+        projectionSurfaceVersion = nextVersion;
+        if (facingChanged) {
+            revealDistance = -1;
+        } else {
+            revealDistance = Math.min(revealDistance, rebuilt.completedRevealDistance());
+        }
+        setChanged();
+    }
+
+    @Nullable
+    public ProjectionSurface getProjectionSurface() {
+        return projectionSurface;
+    }
+
+    public int getRevealDistance() {
+        return revealDistance;
+    }
+
+    public boolean isProjectionVisible() {
+        return projectionSurface != null && (active || revealDistance >= 0);
+    }
+
+    public boolean isActive() {
+        return active;
     }
 }

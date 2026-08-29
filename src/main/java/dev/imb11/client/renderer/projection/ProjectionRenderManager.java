@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexBuffer;
+import dev.imb11.mixins.LevelRendererBufferAccessor;
 import dev.imb11.mixins.LevelRendererInvoker;
 import net.minecraft.client.Camera;
 import net.minecraft.client.CloudStatus;
@@ -411,6 +412,7 @@ public final class ProjectionRenderManager {
         renderBuffers = null;
         if (oldRenderer != null) {
             oldRenderer.setLevel(null);
+            closeGlobalBuffers(oldRenderer);
             oldRenderer.close();
         }
 
@@ -418,6 +420,20 @@ public final class ProjectionRenderManager {
         target = null;
         if (oldTarget != null) {
             oldTarget.destroyBuffers();
+        }
+    }
+
+    private static void closeGlobalBuffers(LevelRenderer oldRenderer) {
+        LevelRendererBufferAccessor buffers = (LevelRendererBufferAccessor) oldRenderer;
+        closeBuffer(buffers.glass$getStarBuffer());
+        closeBuffer(buffers.glass$getSkyBuffer());
+        closeBuffer(buffers.glass$getDarkBuffer());
+        closeBuffer(buffers.glass$getCloudBuffer());
+    }
+
+    private static void closeBuffer(VertexBuffer buffer) {
+        if (buffer != null) {
+            buffer.close();
         }
     }
 

@@ -4,8 +4,10 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
-import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
+import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
+import dev.imb11.projection.ProjectionSurface;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -78,25 +80,21 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         matrices.popPose();
 
-        boolean screenIsRevealing = !entity.neighbouringGlassBlocks.isEmpty()
-                && (entity.active || entity.targetDistance >= 0);
-        if (!screenIsRevealing) {
+        ProjectionSurface surface = entity.getProjectionSurface();
+        if (!entity.isProjectionVisible() || surface == null) {
             return;
         }
 
         ProjectionRenderManager.requestFrame();
 
-        matrices.pushPose();
-        if (ProjectionRenderManager.isReady()) {
-            ProjectorRenderingHelper.renderProjectionSurface(
+        if (ProjectionRenderManager.isReady() && entity.getLevel() instanceof ClientLevel clientLevel) {
+            ProjectionSurfaceRenderer.render(
+                    clientLevel,
+                    entity.getBlockPos(),
+                    surface,
                     matrices,
-                    vertexConsumers,
-                    direction,
-                    entity.neighbouringGlassBlocks,
-                    entity.targetDistance,
-                    ProjectionRenderManager.textureLocation()
+                    entity.getRevealDistance()
             );
         }
-        matrices.popPose();
     }
 }
