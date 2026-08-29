@@ -1,6 +1,6 @@
 package dev.imb11.sync;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 public record Channel(String name, @Nullable BlockPos linkedBlock) {

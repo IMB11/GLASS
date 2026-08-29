@@ -4,23 +4,22 @@ import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import java.util.concurrent.atomic.AtomicReference;
 
-public record C2STerminalChannelChangedPacket(BlockPos pos, String channel) implements CustomPayload, ServerPlayNetworking.PlayPayloadHandler<C2STerminalChannelChangedPacket> {
-    public static final CustomPayload.Id<C2STerminalChannelChangedPacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("glass", "terminal_channel_changed"));
-    public static final PacketCodec<RegistryByteBuf, C2STerminalChannelChangedPacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
+public record C2STerminalChannelChangedPacket(BlockPos pos, String channel) implements CustomPacketPayload, ServerPlayNetworking.PlayPayloadHandler<C2STerminalChannelChangedPacket> {
+    public static final CustomPacketPayload.Type<C2STerminalChannelChangedPacket> PACKET_ID = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("glass", "terminal_channel_changed"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, C2STerminalChannelChangedPacket> PACKET_CODEC = StreamCodec.ofMember((value, buf) -> {
         buf.writeBlockPos(value.pos());
-        buf.writeString(value.channel());
-    }, (buf) -> new C2STerminalChannelChangedPacket(buf.readBlockPos(), buf.readString()));
+        buf.writeUtf(value.channel());
+    }, (buf) -> new C2STerminalChannelChangedPacket(buf.readBlockPos(), buf.readUtf()));
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
 
@@ -32,14 +31,14 @@ public record C2STerminalChannelChangedPacket(BlockPos pos, String channel) impl
         var server = context.server();
         var player = context.player();
 
-        server.executeSync(() -> {
-            var entity = player.getWorld().getBlockEntity(pos);
+        server.executeIfPossible(() -> {
+            var entity = player.level().getBlockEntity(pos);
 
             if (entity instanceof TerminalBlockEntity terminal) {
                 terminal.channel = channel;
-                terminal.markDirty();
+                terminal.setChanged();
 
-                var channelManager = ChannelManagerPersistence.get(player.getWorld());
+                var channelManager = ChannelManagerPersistence.get(player.level());
 
                 AtomicReference<Channel> old = new AtomicReference<>();
 

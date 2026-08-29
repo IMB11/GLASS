@@ -1,15 +1,14 @@
 package dev.imb11.sync;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
-import net.minecraft.datafixer.DataFixTypes;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.saveddata.SavedData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -20,11 +19,11 @@ import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-public class ChannelManagerPersistence extends PersistentState implements Collection<Channel> {
-    public static PersistentState.Type<ChannelManagerPersistence> TYPE = new PersistentState.Type<ChannelManagerPersistence>(ChannelManagerPersistence::new, ChannelManagerPersistence::gather, null);
+public class ChannelManagerPersistence extends SavedData implements Collection<Channel> {
+    public static SavedData.Factory<ChannelManagerPersistence> TYPE = new SavedData.Factory<ChannelManagerPersistence>(ChannelManagerPersistence::new, ChannelManagerPersistence::gather, null);
 
-    public static ChannelManagerPersistence get(World world) {
-        return ((ServerWorld) world).getPersistentStateManager().get(TYPE, "glass_channels");
+    public static ChannelManagerPersistence get(Level world) {
+        return ((ServerLevel) world).getDataStorage().get(TYPE, "glass_channels");
     }
 
     private static final Logger LOGGER = LogManager.getLogger("ChannelManagerPersistence");
@@ -32,11 +31,11 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
     public final Map<String, Channel> CHANNELS = new HashMap<>();
 
     @Override
-    public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        NbtList channels = new NbtList();
+    public CompoundTag save(CompoundTag nbt, HolderLookup.Provider registryLookup) {
+        ListTag channels = new ListTag();
 
         for (Channel channel : CHANNELS.values()) {
-            NbtCompound item = new NbtCompound();
+            CompoundTag item = new CompoundTag();
             item.putString("name", channel.name());
             if (channel.linkedBlock() != null)
                 item.putIntArray("linked_pos", getIntArrayFromBlockPos(channel.linkedBlock()));
@@ -58,18 +57,18 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
         return new int[]{z.getX(), z.getY(), z.getZ()};
     }
 
-    public static BlockPos getFromIntArrayNBT(String key, NbtCompound compound) {
+    public static BlockPos getFromIntArrayNBT(String key, CompoundTag compound) {
         int[] ints = compound.getIntArray(key);
         return new BlockPos(ints[0], ints[1], ints[2]);
     }
 
-    public static ChannelManagerPersistence gather(NbtCompound compound, RegistryWrapper.WrapperLookup registryLookup) {
+    public static ChannelManagerPersistence gather(CompoundTag compound, HolderLookup.Provider registryLookup) {
         ChannelManagerPersistence persistence = new ChannelManagerPersistence();
 
-        NbtList channels = compound.getList("channels", NbtElement.COMPOUND_TYPE);
+        ListTag channels = compound.getList("channels", Tag.TAG_COMPOUND);
 
         for (int i = 0; i < channels.size(); i++) {
-            NbtCompound channel = channels.getCompound(i);
+            CompoundTag channel = channels.getCompound(i);
 
             @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : getFromIntArrayNBT("linked_pos", channel);
             Channel channel1 = new Channel(channel.getString("name"), bpos);
@@ -82,8 +81,8 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
 
     public static void init() {
         ServerWorldEvents.LOAD.register((server, world) -> {
-            PersistentState state = world.getPersistentStateManager().getOrCreate(TYPE, "glass_channels");
-            LOGGER.info("Loaded ChannelManagerPersistence for: " + world.getRegistryKey().getValue() + " at " + world);
+            SavedData state = world.getDataStorage().computeIfAbsent(TYPE, "glass_channels");
+            LOGGER.info("Loaded ChannelManagerPersistence for: " + world.dimension().location() + " at " + world);
         });
     }
 
@@ -127,14 +126,14 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
     @Override
     public boolean add(Channel channel) {
         CHANNELS.put(channel.name(), channel);
-        this.markDirty();
+        this.setDirty();
         return true;
     }
 
     @Override
     public boolean remove(Object o) {
         boolean e = CHANNELS.values().remove(o);
-        this.markDirty();
+        this.setDirty();
         return e;
     }
 
@@ -148,21 +147,21 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
         for (Channel channel : collection) {
             CHANNELS.put(channel.name(), channel);
         }
-        this.markDirty();
+        this.setDirty();
         return true;
     }
 
     @Override
     public boolean removeAll(@NotNull Collection<?> collection) {
         boolean e = CHANNELS.values().removeAll(collection);
-        this.markDirty();
+        this.setDirty();
         return e;
     }
 
     @Override
     public boolean retainAll(@NotNull Collection<?> collection) {
         boolean e = CHANNELS.values().retainAll(collection);
-        this.markDirty();
+        this.setDirty();
         return e;
     }
 
@@ -174,7 +173,7 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
     @Override
     public boolean removeIf(Predicate<? super Channel> filter) {
         boolean e = CHANNELS.values().removeIf(filter);
-        this.markDirty();
+        this.setDirty();
         return e;
     }
 
@@ -199,6 +198,6 @@ public class ChannelManagerPersistence extends PersistentState implements Collec
     @Override
     public void clear() {
         CHANNELS.clear();
-        this.markDirty();
+        this.setDirty();
     }
 }

@@ -12,14 +12,14 @@ import io.github.cottonmc.cotton.gui.widget.WPlainPanel;
 import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.MenuType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -27,11 +27,11 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ProjectorBlockGUI extends SyncedGuiDescription {
-    public static final ScreenHandlerType<ProjectorBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new ProjectorBlockGUI(syncId, inventory, (ProjectorBlockEntity.ScreenHandlerData) data), ProjectorBlockEntity.ScreenHandlerData.CODEC);
+    public static final MenuType<ProjectorBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new ProjectorBlockGUI(syncId, inventory, (ProjectorBlockEntity.ScreenHandlerData) data), ProjectorBlockEntity.ScreenHandlerData.CODEC);
 
     private static final int WIDTH = 7*18*2;
     private static final int HEIGHT = 6*18*2;
-    public ProjectorBlockGUI(int syncId, PlayerInventory playerInventory, ProjectorBlockEntity.ScreenHandlerData data) {
+    public ProjectorBlockGUI(int syncId, Inventory playerInventory, ProjectorBlockEntity.ScreenHandlerData data) {
         super(SCREEN_HANDLER_TYPE, syncId, playerInventory);
 
         WPlainPanel root = new WPlainPanel();
@@ -42,15 +42,15 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
 
         AtomicReference<String> selectedChannel = new AtomicReference<>(data.channel());
         BlockPos pos = data.pos();
-        NbtCompound nbt = data.compound();
+        CompoundTag nbt = data.compound();
 
         ArrayList<Channel> channels = new ArrayList<>();
 
         assert nbt != null;
-        NbtList _channels = nbt.getList("channels", NbtElement.COMPOUND_TYPE);
+        ListTag _channels = nbt.getList("channels", Tag.TAG_COMPOUND);
 
         for (int i = 0; i < _channels.size(); i++) {
-            NbtCompound channel = _channels.getCompound(i);
+            CompoundTag channel = _channels.getCompound(i);
             @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : ChannelManagerPersistence.getFromIntArrayNBT("linked_pos", channel);
             Channel channel1 = new Channel(channel.getString("name"), bpos);
             channels.add(channel1);
@@ -83,13 +83,13 @@ public class ProjectorBlockGUI extends SyncedGuiDescription {
                 btn.setEnabled(false);
             }
 
-            btn.setLabel(Text.literal(channel.name()));
+            btn.setLabel(Component.literal(channel.name()));
 
             if(channel.linkedBlock() == null) {
-                btn.setLabel(Text.literal(channel.name()).formatted(Formatting.DARK_RED, Formatting.ITALIC));
-                btn.setTooltip(Text.literal("Channel not linked to a terminal.").formatted(Formatting.RED));
+                btn.setLabel(Component.literal(channel.name()).withStyle(ChatFormatting.DARK_RED, ChatFormatting.ITALIC));
+                btn.setTooltip(Component.literal("Channel not linked to a terminal.").withStyle(ChatFormatting.RED));
             } else {
-                btn.setTooltip(Text.literal("Terminal Position: ").append(Text.literal(channel.linkedBlock().toShortString()).formatted(Formatting.GRAY)));
+                btn.setTooltip(Component.literal("Terminal Position: ").append(Component.literal(channel.linkedBlock().toShortString()).withStyle(ChatFormatting.GRAY)));
             }
 
             channelButtons.add(btn);

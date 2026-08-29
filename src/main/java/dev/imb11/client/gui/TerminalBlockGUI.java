@@ -11,14 +11,14 @@ import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.MenuType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -28,7 +28,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class TerminalBlockGUI extends SyncedGuiDescription {
-    public static final ScreenHandlerType<TerminalBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new TerminalBlockGUI(syncId, inventory, (TerminalBlockEntity.ScreenHandlerData) data), TerminalBlockEntity.ScreenHandlerData.CODEC);
+    public static final MenuType<TerminalBlockGUI> SCREEN_HANDLER_TYPE = new ExtendedScreenHandlerType<>((ExtendedScreenHandlerType.ExtendedFactory) (syncId, inventory, data) -> new TerminalBlockGUI(syncId, inventory, (TerminalBlockEntity.ScreenHandlerData) data), TerminalBlockEntity.ScreenHandlerData.CODEC);
 
     public BlockPos pos;
 
@@ -37,7 +37,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
     private WButton unlinkChannelButton;
 
-    public TerminalBlockGUI(int syncId, PlayerInventory playerInventory, TerminalBlockEntity.ScreenHandlerData context) {
+    public TerminalBlockGUI(int syncId, Inventory playerInventory, TerminalBlockEntity.ScreenHandlerData context) {
         super(SCREEN_HANDLER_TYPE, syncId, playerInventory);
 
         WPlainPanel root = new WPlainPanel();
@@ -48,15 +48,15 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         pos = context.pos();
 
-        NbtCompound nbt = context.channelManagerNbt();
+        CompoundTag nbt = context.channelManagerNbt();
 
         ArrayList<Channel> channels = new ArrayList<>();
 
         assert nbt != null;
-        NbtList _channels = nbt.getList("channels", NbtElement.COMPOUND_TYPE);
+        ListTag _channels = nbt.getList("channels", Tag.TAG_COMPOUND);
 
         for (int i = 0; i < _channels.size(); i++) {
-            NbtCompound channel = _channels.getCompound(i);
+            CompoundTag channel = _channels.getCompound(i);
             @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : ChannelManagerPersistence.getFromIntArrayNBT("linked_pos", channel);
             Channel channel1 = new Channel(channel.getString("name"), bpos);
             channels.add(channel1);
@@ -71,7 +71,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         ArrayList<WButtonTooltip> channelButtons = new ArrayList<>();
 
-//        WPortalFrame previewFrame = new WPortalFrame(this.world.getRegistryKey(), new Vec3d(pos.getX(), pos.getY(), pos.getZ()));
+//        WPortalFrame previewFrame = new WPortalFrame(this.world.dimension(), new Vec3(pos.getX(), pos.getY(), pos.getZ()));
 //
 //        root.add(previewFrame, (WIDTH/2), 120, (WIDTH/2) - 5, HEIGHT - 120 - 5);
         // Doesn't work
@@ -98,7 +98,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 btn.setEnabled(false);
                 unlinkChannelButton.setEnabled(true);
 
-                this.onClosed(playerInventory.player);
+                this.removed(playerInventory.player);
             });
 
             if (channel.linkedBlock() != null) {
@@ -107,11 +107,11 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 }
                 else {
                     btn.setEnabled(false);
-                    btn.setTooltip(Text.literal("Channel is being used by another terminal."), Text.literal(channel.linkedBlock().toShortString()).formatted(Formatting.GRAY, Formatting.ITALIC));
+                    btn.setTooltip(Component.literal("Channel is being used by another terminal."), Component.literal(channel.linkedBlock().toShortString()).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
                 }
             }
 
-            btn.setLabel(Text.literal(channel.name()));
+            btn.setLabel(Component.literal(channel.name()));
 
             channelButtons.add(btn);
         });
@@ -138,7 +138,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
             unlinkChannelButton.setEnabled(false);
         });
 
-        unlinkChannelButton.setLabel(Text.literal("Unlink Terminal"));
+        unlinkChannelButton.setLabel(Component.literal("Unlink Terminal"));
 
         unlinkChannelButton.setEnabled(false);
 
@@ -154,7 +154,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         AtomicReference<String> channelNameBoxValue = new AtomicReference<>("");
 
-        WTextField channelNameBox = new WTextField(Text.literal("Channel Name"));
+        WTextField channelNameBox = new WTextField(Component.literal("Channel Name"));
         channelNameBox.setChangedListener(channelNameBoxValue::set);
 
         root.add(channelNameBox, (WIDTH/2), 10, (WIDTH/2) - 6, 20);
@@ -163,11 +163,11 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         addChannel.setOnClick(() -> {
             String val = channelNameBoxValue.get();
             if(val.isBlank()) {
-                addChannel.setLabel(Text.literal("Invalid Channel Name").formatted(Formatting.RED));
+                addChannel.setLabel(Component.literal("Invalid Channel Name").withStyle(ChatFormatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        addChannel.setLabel(Text.literal("Add Channel"));
+                        addChannel.setLabel(Component.literal("Add Channel"));
                     }
                 }, 1000);
             } else {
@@ -180,17 +180,17 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 channelNameBoxValue.set("");
                 channelNameBox.setText("");
                 channelNameBox.releaseFocus();
-                addChannel.setLabel(Text.literal("Added!").formatted(Formatting.GREEN));
+                addChannel.setLabel(Component.literal("Added!").withStyle(ChatFormatting.GREEN));
                 new Timer().schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        addChannel.setLabel(Text.literal("Add Channel"));
+                        addChannel.setLabel(Component.literal("Add Channel"));
                     }
                 }, 1000);
             }
         });
 
-        addChannel.setLabel(Text.literal("Add Channel"));
+        addChannel.setLabel(Component.literal("Add Channel"));
 
         root.add(addChannel, (WIDTH/2), 35, (WIDTH/2) - 5, 20);
 
@@ -198,11 +198,11 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         removeChannel.setOnClick(() -> {
             String val = channelNameBoxValue.get();
             if(val.isBlank()) {
-                removeChannel.setLabel(Text.literal("Invalid Channel Name").formatted(Formatting.RED));
+                removeChannel.setLabel(Component.literal("Invalid Channel Name").withStyle(ChatFormatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        removeChannel.setLabel(Text.literal("Remove Channel"));
+                        removeChannel.setLabel(Component.literal("Remove Channel"));
                     }
                 }, 1000);
             } else {
@@ -212,31 +212,31 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                         ClientPlayNetworking.send(new C2SDeleteChannelPacket(channel.name()));
                         channels.remove(channel);
                         channelList.layout();
-                        removeChannel.setLabel(Text.literal("Removed!").formatted(Formatting.GREEN));
+                        removeChannel.setLabel(Component.literal("Removed!").withStyle(ChatFormatting.GREEN));
                         new Timer().schedule(new TimerTask() {
                             @Override
                             public void run() {
-                                removeChannel.setLabel(Text.literal("Remove Channel"));
+                                removeChannel.setLabel(Component.literal("Remove Channel"));
                             }
                         }, 1000);
                         return;
                     }
                 }
-                removeChannel.setLabel(Text.literal("Invalid Channel").formatted(Formatting.RED));
+                removeChannel.setLabel(Component.literal("Invalid Channel").withStyle(ChatFormatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        removeChannel.setLabel(Text.literal("Remove Channel"));
+                        removeChannel.setLabel(Component.literal("Remove Channel"));
                     }
                 }, 1000);
             }
         });
-        removeChannel.setLabel(Text.literal("Remove Channel"));
+        removeChannel.setLabel(Component.literal("Remove Channel"));
 
         root.add(removeChannel, (WIDTH/2), 60, (WIDTH/2) - 5, 20);
         root.add(unlinkChannelButton, (WIDTH/2), 85, (WIDTH/2) - 5, 20);
 
-        WLabel previewLabel = new WLabel(Text.literal("Preview").formatted(Formatting.GRAY));
+        WLabel previewLabel = new WLabel(Component.literal("Preview").withStyle(ChatFormatting.GRAY));
 
         root.add(previewLabel, (WIDTH/2), 110, (WIDTH/2) - 5, 5);
 

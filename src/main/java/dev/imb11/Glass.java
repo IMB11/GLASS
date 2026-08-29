@@ -7,10 +7,6 @@ import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GNetworking;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.PersistentState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,29 +1,32 @@
 package dev.imb11.client.renderer.block;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gl.SimpleFramebuffer;
-import net.minecraft.client.render.*;
-import net.minecraft.client.render.block.BlockModelRenderer;
-import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.block.ModelBlockRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 
 import java.util.Objects;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
 
-    public Framebuffer framebuffer;
+    public RenderTarget framebuffer;
 
-    public ProjectorBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {}
+    public ProjectorBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {}
 
     private static float interpolateRotation(float prevRotation, float nextRotation, float partialTick) {
         float f3;
@@ -43,54 +46,54 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
 
     @Override
-    public void render(ProjectorBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
-        matrices.push();
+    public void render(ProjectorBlockEntity entity, float tickDelta, PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
+        matrices.pushPose();
 
         matrices.translate(0.5D, 0.5D, 0.5D);
 
         float scale = 0.5f;
 
-        Direction direction = entity.getCachedState().get(ProjectorBlock.FACING);
+        Direction direction = entity.getBlockState().getValue(ProjectorBlock.FACING);
         if (direction == Direction.DOWN) {
-            matrices.multiply(new Quaternionf().rotationXYZ((float) Math.toRadians(180.0f), 0.0f, 0.0f));
-        } else if (direction.getHorizontal() >= 0) {
-            int horizontalIndex = direction.getHorizontal();
-            matrices.multiply(new Quaternionf().rotationY((float) Math.toRadians(-horizontalIndex * 90f)));
-            matrices.multiply(new Quaternionf().rotationX((float) Math.toRadians(90f)));
+            matrices.mulPose(new Quaternionf().rotationXYZ((float) Math.toRadians(180.0f), 0.0f, 0.0f));
+        } else if (direction.get2DDataValue() >= 0) {
+            int horizontalIndex = direction.get2DDataValue();
+            matrices.mulPose(new Quaternionf().rotationY((float) Math.toRadians(-horizontalIndex * 90f)));
+            matrices.mulPose(new Quaternionf().rotationX((float) Math.toRadians(90f)));
         }
 
         float rot = interpolateRotation(entity.rotationBeacon, entity.rotationBeaconPrev, tickDelta);
-        matrices.multiply(new Quaternionf().rotationY((float) Math.toRadians(rot)));
+        matrices.mulPose(new Quaternionf().rotationY((float) Math.toRadians(rot)));
         matrices.translate(-0.25D, -0.25D, -0.25D);
         matrices.scale(scale, scale, scale);
 
-        BlockRenderManager blockRenderManager = MinecraftClient.getInstance().getBlockRenderManager();
-        BlockModelRenderer blockModelRenderer = blockRenderManager.getModelRenderer();
+        BlockRenderDispatcher blockRenderManager = Minecraft.getInstance().getBlockRenderer();
+        ModelBlockRenderer blockModelRenderer = blockRenderManager.getModelRenderer();
 
-        int lightAbove = WorldRenderer.getLightmapCoordinates(Objects.requireNonNull(entity.getWorld()), entity.getPos().up());
+        int lightAbove = LevelRenderer.getLightColor(Objects.requireNonNull(entity.getLevel()), entity.getBlockPos().above());
 
-        blockModelRenderer.render(matrices.peek(),
-                vertexConsumers.getBuffer(RenderLayers.getBlockLayer(Blocks.BEACON.getDefaultState())),
-                Blocks.BEACON.getDefaultState(),
-                blockRenderManager.getModel(Blocks.BEACON.getDefaultState()),
+        blockModelRenderer.renderModel(matrices.last(),
+                vertexConsumers.getBuffer(ItemBlockRenderTypes.getChunkRenderType(Blocks.BEACON.defaultBlockState())),
+                Blocks.BEACON.defaultBlockState(),
+                blockRenderManager.getBlockModel(Blocks.BEACON.defaultBlockState()),
                 1f,
                 1f,
                 1f,
                 lightAbove,
-                OverlayTexture.DEFAULT_UV);
+                OverlayTexture.NO_OVERLAY);
 
-        matrices.pop();
+        matrices.popPose();
 
         int maxDistance = entity.furthestBlock + 3;
 
         // Render the world onto the facing direction.
         if (framebuffer == null) {
-            framebuffer = new SimpleFramebuffer(512, 512, true, MinecraftClient.IS_SYSTEM_MAC);
+            framebuffer = new TextureTarget(512, 512, true, Minecraft.ON_OSX);
         }
 
-        matrices.push();
-        ProjectorRenderingHelper.renderEdgePanels(Vec3d.of(entity.getPos()), matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
-        matrices.pop();
+        matrices.pushPose();
+        ProjectorRenderingHelper.renderEdgePanels(Vec3.atLowerCornerOf(entity.getBlockPos()), matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
+        matrices.popPose();
 
 //        matrices.push();
 //        ProjectorRenderingHelper.renderWorldFramebuffer(new BlockPos(20, -58, 4), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);

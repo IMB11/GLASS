@@ -6,7 +6,7 @@ import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.client.gui.TerminalBlockScreen;
 import dev.imb11.blocks.GBlocks;
 import net.fabricmc.api.ClientModInitializer;
-import net.minecraft.client.gui.screen.ingame.HandledScreens;
+import net.minecraft.client.gui.screens.MenuScreens;
 
 public class GlassClient implements ClientModInitializer {
 
@@ -14,7 +14,7 @@ public class GlassClient implements ClientModInitializer {
     public void onInitializeClient() {
         GBlocks.initClient();
 
-        HandledScreens.<TerminalBlockGUI, TerminalBlockScreen>register(TerminalBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new TerminalBlockScreen(gui, inventory.player, title));
-        HandledScreens.<ProjectorBlockGUI, ProjectorBlockScreen>register(ProjectorBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new ProjectorBlockScreen(gui, inventory.player, title));
+        MenuScreens.<TerminalBlockGUI, TerminalBlockScreen>register(TerminalBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new TerminalBlockScreen(gui, inventory.player, title));
+        MenuScreens.<ProjectorBlockGUI, ProjectorBlockScreen>register(ProjectorBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new ProjectorBlockScreen(gui, inventory.player, title));
     }
 }

@@ -1,16 +1,19 @@
 package dev.imb11.client.renderer.block;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.TerminalBlock;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.*;
-import net.minecraft.client.render.block.BlockModelRenderer;
-import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Direction;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.block.ModelBlockRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Blocks;
 import org.apache.commons.lang3.ArrayUtils;
 import org.joml.Quaternionf;
 
@@ -18,13 +21,13 @@ import java.util.Objects;
 
 public class TerminalBlockEntityRenderer implements BlockEntityRenderer<TerminalBlockEntity> {
 
-    public TerminalBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {}
+    public TerminalBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {}
 
     @Override
-    public void render(TerminalBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
-        Direction facing = entity.getCachedState().get(TerminalBlock.FACING);
+    public void render(TerminalBlockEntity entity, float tickDelta, PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
+        Direction facing = entity.getBlockState().getValue(TerminalBlock.FACING);
 
-        matrices.push();
+        matrices.pushPose();
 
 //        matrices.translate(0.25f, 0.5f-(0.25f/2f), 0.80f);
 
@@ -32,7 +35,7 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
         matrices.translate(0.5, 0.5, 0.5);
 
-        var e = new float[] {45, facing.getOffsetX(), facing.getOffsetY(), facing.getOffsetZ() };
+        var e = new float[] {45, facing.getStepX(), facing.getStepY(), facing.getStepZ() };
 
         boolean needBreak = false;
         for (float v : e) {
@@ -46,15 +49,15 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
                 int axis = ArrayUtils.indexOf(e, v) - 1;
                 switch (axis) {
                     case 0 -> {
-                        matrices.multiply(new Quaternionf().rotationX((float) Math.toRadians(45)));
+                        matrices.mulPose(new Quaternionf().rotationX((float) Math.toRadians(45)));
                         needBreak = true;
                     }
                     case 1 -> {
-                        matrices.multiply(new Quaternionf().rotationY((float) Math.toRadians(45)));
+                        matrices.mulPose(new Quaternionf().rotationY((float) Math.toRadians(45)));
                         needBreak = true;
                     }
                     case 2 -> {
-                        matrices.multiply(new Quaternionf().rotationZ((float) Math.toRadians(45)));
+                        matrices.mulPose(new Quaternionf().rotationZ((float) Math.toRadians(45)));
                         needBreak = true;
                     }
                 }
@@ -63,25 +66,25 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
         matrices.translate(-0.5, -0.5, -0.5);
         matrices.translate(0.375, 0.375, 0.375);
-        matrices.translate(facing.getOffsetX() * -0.4D, facing.getOffsetY() * -0.4D, facing.getOffsetZ() * -0.4D);
+        matrices.translate(facing.getStepX() * -0.4D, facing.getStepY() * -0.4D, facing.getStepZ() * -0.4D);
 
         matrices.scale(scale, scale, scale);
 
-        BlockRenderManager blockRenderManager = MinecraftClient.getInstance().getBlockRenderManager();
-        BlockModelRenderer blockModelRenderer = blockRenderManager.getModelRenderer();
+        BlockRenderDispatcher blockRenderManager = Minecraft.getInstance().getBlockRenderer();
+        ModelBlockRenderer blockModelRenderer = blockRenderManager.getModelRenderer();
 
-        int lightAbove = WorldRenderer.getLightmapCoordinates(Objects.requireNonNull(entity.getWorld()), entity.getPos().up());
+        int lightAbove = LevelRenderer.getLightColor(Objects.requireNonNull(entity.getLevel()), entity.getBlockPos().above());
 
-        blockModelRenderer.render(matrices.peek(),
-                vertexConsumers.getBuffer(RenderLayers.getBlockLayer(Blocks.GLASS.getDefaultState())),
-                Blocks.GLASS.getDefaultState(),
-                blockRenderManager.getModel(Blocks.GLASS.getDefaultState()),
+        blockModelRenderer.renderModel(matrices.last(),
+                vertexConsumers.getBuffer(ItemBlockRenderTypes.getChunkRenderType(Blocks.GLASS.defaultBlockState())),
+                Blocks.GLASS.defaultBlockState(),
+                blockRenderManager.getBlockModel(Blocks.GLASS.defaultBlockState()),
                 1f,
                 1f,
                 1f,
                 lightAbove,
-                OverlayTexture.DEFAULT_UV);
+                OverlayTexture.NO_OVERLAY);
 
-        matrices.pop();
+        matrices.popPose();
     }
 }

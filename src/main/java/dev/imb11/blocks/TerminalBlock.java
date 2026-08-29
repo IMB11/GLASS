@@ -5,51 +5,51 @@ import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.DirectionProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-public class TerminalBlock extends BlockWithEntity {
-    public TerminalBlock(Settings settings) {
+public class TerminalBlock extends BaseEntityBlock {
+    public TerminalBlock(Properties settings) {
         super(settings);
     }
 
     @Override
-    protected MapCodec<? extends BlockWithEntity> getCodec() {
+    protected MapCodec<? extends BaseEntityBlock> codec() {
         return null;
     }
 
-    public static final DirectionProperty FACING = Properties.FACING;
+    public static final DirectionProperty FACING = BlockStateProperties.FACING;
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
     }
 
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new TerminalBlockEntity(pos, state);
     }
 
 
 
     @Override
-    public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
-        super.onBreak(world, pos, state, player);
+    public BlockState playerWillDestroy(Level world, BlockPos pos, BlockState state, Player player) {
+        super.playerWillDestroy(world, pos, state, player);
 
-        if (world.isClient) {
+        if (world.isClientSide) {
             return state;
         }
 
@@ -66,29 +66,29 @@ public class TerminalBlock extends BlockWithEntity {
     }
 
     @Override
-    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
         // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
-        // such as the one from BlockWithEntity
+        // such as the one from BaseEntityBlock
 
-        if (world.isClient) {
-            return ActionResult.PASS;
+        if (world.isClientSide) {
+            return InteractionResult.PASS;
         }
 
-        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.createScreenHandlerFactory(world, pos);
+        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.getMenuProvider(world, pos);
 
-        player.openHandledScreen(handlerFactory);
+        player.openMenu(handlerFactory);
 
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING);
     }
 
     @Nullable
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        return this.getDefaultState().with(FACING, ctx.getPlayerLookDirection());
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        return this.defaultBlockState().setValue(FACING, ctx.getNearestLookingDirection());
     }
 }

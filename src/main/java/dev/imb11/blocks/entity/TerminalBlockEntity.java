@@ -6,23 +6,22 @@ import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
@@ -35,24 +34,24 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
     }
 
     @Override
-    public void writeNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
+    public void saveAdditional(CompoundTag tag, HolderLookup.Provider lookup) {
         tag.putString("channel", channel);
     }
 
     @Override
-    public void readNbt(NbtCompound tag, RegistryWrapper.WrapperLookup lookup) {
+    public void loadAdditional(CompoundTag tag, HolderLookup.Provider lookup) {
         channel = tag.getString("channel");
     }
 
     @Nullable
     @Override
-    public Packet<ClientPlayPacketListener> toUpdatePacket() {
-        return BlockEntityUpdateS2CPacket.create(this);
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup lookup) {
-        return createNbt(lookup);
+    public CompoundTag getUpdateTag(HolderLookup.Provider lookup) {
+        return saveWithoutMetadata(lookup);
     }
 
     @Override
@@ -61,34 +60,34 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
     }
 
     @Override
-    public Text getDisplayName() {
+    public Component getDisplayName() {
         // Using the block name as the screen title
-        return Text.literal("G.L.A.S.S Terminal");
+        return Component.literal("G.L.A.S.S Terminal");
     }
 
     @Override
-    public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        return new TerminalBlockGUI(syncId, inventory, new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound(), null)));
+    public AbstractContainerMenu createMenu(int syncId, Inventory inventory, Player player) {
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.level());
+        return new TerminalBlockGUI(syncId, inventory, new ScreenHandlerData(this.getBlockPos(), channelManager.save(new CompoundTag(), null)));
     }
 
-    public record ScreenHandlerData(BlockPos pos, NbtCompound channelManagerNbt) {
-        public static final PacketCodec<RegistryByteBuf, ScreenHandlerData> CODEC = PacketCodec.ofStatic(
+    public record ScreenHandlerData(BlockPos pos, CompoundTag channelManagerNbt) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, ScreenHandlerData> CODEC = StreamCodec.of(
                 (buf, instance) -> {
                     buf.writeBlockPos(instance.pos());
                     buf.writeNbt(instance.channelManagerNbt());
                 },
                 (buf) -> {
                     BlockPos pos = buf.readBlockPos();
-                    NbtCompound channelManagerNbt = buf.readNbt();
+                    CompoundTag channelManagerNbt = buf.readNbt();
                     return new ScreenHandlerData(pos, channelManagerNbt);
                 }
         );
     }
 
     @Override
-    public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
-        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        return new ScreenHandlerData(this.getPos(), channelManager.writeNbt(new NbtCompound(), null));
+    public ScreenHandlerData getScreenOpeningData(ServerPlayer player) {
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.level());
+        return new ScreenHandlerData(this.getBlockPos(), channelManager.save(new CompoundTag(), null));
     }
 }

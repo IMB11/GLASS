@@ -10,27 +10,26 @@ import dev.imb11.util.BoundingBox2D;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.q_misc_util.my_util.DQuaternion;
@@ -40,7 +39,7 @@ import java.util.*;
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static int FADEOUT_TIME_MAX = 12;
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
-    public final ArrayList<Pair<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
+    public final ArrayList<Tuple<BlockPos, Integer>> neighbouringGlassBlocks = new ArrayList<>();
     private final Set<BlockPos> visitedBlocks = new HashSet<>();
     public int fadeoutTime = 12;
     public boolean active = false;
@@ -70,10 +69,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         return directionsToCheck;
     }
 
-    public static void tick(World world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
+    public static void tick(Level world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
         be.tick(world);
 
-        be.active = world.isReceivingRedstonePower(pos);
+        be.active = world.hasNeighborSignal(pos);
         float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
         if (rotationFactor > 0) {
             be.rotationBeacon += 20F * rotationFactor;
@@ -86,24 +85,24 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
             int maxDistance = be.furthestBlock + 3;
             be.targetDistance = (int) Math.min(maxDistance, (System.currentTimeMillis() - activeSince) / 50);
-            be.markDirty();
+            be.setChanged();
         } else {
             if (be.deactiveSince == -1) {
                 be.deactiveSince = System.currentTimeMillis();
-                be.markDirty();
+                be.setChanged();
             }
 
             // Decrement the target distance to -1 every 25ms
             if (be.targetDistance > -1 && System.currentTimeMillis() - be.deactiveSince > 25L) {
                 be.targetDistance--;
                 be.deactiveSince = System.currentTimeMillis();
-                be.markDirty();
+                be.setChanged();
             }
         }
     }
 
     @Override
-    public void writeNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
+    public void saveAdditional(CompoundTag tag, HolderLookup.Provider registryLookup) {
         tag.putFloat("rotationBeacon", rotationBeacon);
         tag.putFloat("rotationBeaconPrev", rotationBeaconPrev);
         tag.putString("channel", channel);
@@ -114,21 +113,21 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         tag.putInt("targetDistance", targetDistance);
 
         if (this.portal != null) {
-            tag.putUuid("portal", this.portal.getUuid());
+            tag.putUUID("portal", this.portal.getUUID());
         }
 
-        super.writeNbt(tag, registryLookup);
+        super.saveAdditional(tag, registryLookup);
     }
 
-    public void createPortal(ServerWorld world) {
+    public void createPortal(ServerLevel world) {
         this.boundingBox = null;
 
-        Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
+        Direction facing = this.getBlockState().getValue(ProjectorBlock.FACING);
 
         // Get where distance is 0, then make
-        for (Pair<BlockPos, Integer> neighbouringGlassBlock : neighbouringGlassBlocks) {
-            if (neighbouringGlassBlock.getRight() == 0) {
-                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getLeft(), facing);
+        for (Tuple<BlockPos, Integer> neighbouringGlassBlock : neighbouringGlassBlocks) {
+            if (neighbouringGlassBlock.getB() == 0) {
+                boundingBox = new BoundingBox2D(neighbouringGlassBlock.getA(), facing);
                 break;
             }
         }
@@ -138,9 +137,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             return;
         }
 
-        for (Pair<BlockPos, Integer> neighbouringGlassBlock : this.neighbouringGlassBlocks) {
-            BlockPos pos = neighbouringGlassBlock.getLeft();
-            int distance = neighbouringGlassBlock.getRight();
+        for (Tuple<BlockPos, Integer> neighbouringGlassBlock : this.neighbouringGlassBlocks) {
+            BlockPos pos = neighbouringGlassBlock.getA();
+            int distance = neighbouringGlassBlock.getB();
 
             if (distance == 0) {
                 continue;
@@ -163,19 +162,19 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
         Portal portal = Portal.ENTITY_TYPE.create(world);
 
-        portal.setDestinationDimension(World.OVERWORLD); // TODO: Use GlobalPos
+        portal.setDestinationDimension(Level.OVERWORLD); // TODO: Use GlobalPos
 
-        Vec3d offset = switch (facing.getOpposite()) {
-            case NORTH -> new Vec3d(0, 0, -1);
-            case SOUTH -> new Vec3d(0, 0, 1);
-            case EAST -> new Vec3d(1, 0, 0);
-            case WEST -> new Vec3d(-1, 0, 0);
-            case UP -> new Vec3d(0, 1, 0);
-            case DOWN -> new Vec3d(0, -1, 0);
+        Vec3 offset = switch (facing.getOpposite()) {
+            case NORTH -> new Vec3(0, 0, -1);
+            case SOUTH -> new Vec3(0, 0, 1);
+            case EAST -> new Vec3(1, 0, 0);
+            case WEST -> new Vec3(-1, 0, 0);
+            case UP -> new Vec3(0, 1, 0);
+            case DOWN -> new Vec3(0, -1, 0);
         };
 
         // Apply the offset to the destination position
-        portal.setDestination(channel.linkedBlock().toCenterPos().add(offset));
+        portal.setDestination(channel.linkedBlock().getCenter().add(offset));
 
         portal.setInteractable(false);
         portal.setTeleportable(false);
@@ -187,32 +186,32 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         // Set portal orientation
         switch (facing) {
             case NORTH, SOUTH:
-                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3(0, 1, 0), facing == Direction.NORTH ? 180 : 0));
                 break;
             case EAST, WEST:
-                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(0, 1, 0), facing == Direction.EAST ? 90 : -90));
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3(0, 1, 0), facing == Direction.EAST ? 90 : -90));
                 break;
             case UP, DOWN:
-                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3d(1, 0, 0), facing == Direction.DOWN ? 90 : -90));
+                portal.setOrientationRotation(DQuaternion.rotationByDegrees(new Vec3(1, 0, 0), facing == Direction.DOWN ? 90 : -90));
                 break;
         }
 
         // Populate portal tiles
-        boolean shouldFlip = facing.getDirection() == Direction.AxisDirection.NEGATIVE;
-        boundingBox.addSquares(this.getPos(), portal, 0, shouldFlip);
+        boolean shouldFlip = facing.getAxisDirection() == Direction.AxisDirection.NEGATIVE;
+        boundingBox.addSquares(this.getBlockPos(), portal, 0, shouldFlip);
 
         // Set portal position
-        Vec3d facePos = this.boundingBox.getMidpoint();
-        facePos = facePos.add(new Vec3d(0.001d, 0.001d, 0.001d).multiply(Vec3d.of(facing.getVector())));
+        Vec3 facePos = this.boundingBox.getMidpoint();
+        facePos = facePos.add(new Vec3(0.001d, 0.001d, 0.001d).multiply(Vec3.atLowerCornerOf(facing.getNormal())));
         portal.setOriginPos(facePos);
 
-        portal.getWorld().spawnEntity(portal);
+        portal.level().addFreshEntity(portal);
 
         this.portal = portal;
     }
 
     @Override
-    public void readNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
+    public void loadAdditional(CompoundTag tag, HolderLookup.Provider registryLookup) {
         channel = tag.getString("channel");
         rotationBeacon = tag.getFloat("rotationBeacon");
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
@@ -223,57 +222,57 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         targetDistance = tag.getInt("targetDistance");
 
         try {
-            if (!this.world.isClient) {
-                var serverWorld = (ServerWorld) this.world;
-                this.portal = (Portal) serverWorld.getEntity(tag.getUuid("portal"));
+            if (!this.level.isClientSide) {
+                var serverWorld = (ServerLevel) this.level;
+                this.portal = (Portal) serverWorld.getEntity(tag.getUUID("portal"));
             }
         } catch (Exception ignored) {}
 
-        super.readNbt(tag, registryLookup);
+        super.loadAdditional(tag, registryLookup);
     }
 
     @Override
-    public Text getDisplayName() {
-        return Text.literal("G.L.A.S.S Projector");
+    public Component getDisplayName() {
+        return Component.literal("G.L.A.S.S Projector");
     }
 
     @Override
-    public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
+    public AbstractContainerMenu createMenu(int syncId, Inventory inventory, Player player) {
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.level());
 
-        return new ProjectorBlockGUI(syncId, inventory, new ScreenHandlerData(channel, this.getPos(), channelManager.writeNbt(new NbtCompound(), null)));
+        return new ProjectorBlockGUI(syncId, inventory, new ScreenHandlerData(channel, this.getBlockPos(), channelManager.save(new CompoundTag(), null)));
     }
 
-    public record ScreenHandlerData(String channel, BlockPos pos, NbtCompound compound) {
-        public static final PacketCodec<RegistryByteBuf, ScreenHandlerData> CODEC = PacketCodec.ofStatic(
+    public record ScreenHandlerData(String channel, BlockPos pos, CompoundTag compound) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, ScreenHandlerData> CODEC = StreamCodec.of(
                 (buf, instance) -> {
-                    buf.writeString(instance.channel);
+                    buf.writeUtf(instance.channel);
                     buf.writeBlockPos(instance.pos);
                     buf.writeNbt(instance.compound);
                 },
-                (buf) -> new ScreenHandlerData(buf.readString(), buf.readBlockPos(), buf.readNbt())
+                (buf) -> new ScreenHandlerData(buf.readUtf(), buf.readBlockPos(), buf.readNbt())
         );
     }
 
     @Override
-    public ScreenHandlerData getScreenOpeningData(ServerPlayerEntity player) {
-        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.getWorld());
-        return new ScreenHandlerData(channel, pos, channelManager.writeNbt(new NbtCompound(), null));
+    public ScreenHandlerData getScreenOpeningData(ServerPlayer player) {
+        ChannelManagerPersistence channelManager = ChannelManagerPersistence.get(player.level());
+        return new ScreenHandlerData(channel, worldPosition, channelManager.save(new CompoundTag(), null));
     }
 
-    public void tick(World world) {
-        Direction facing = this.getCachedState().get(ProjectorBlock.FACING);
+    public void tick(Level world) {
+        Direction facing = this.getBlockState().getValue(ProjectorBlock.FACING);
         if (active) {
             if (activeSince == -1) {
                 activeSince = System.currentTimeMillis();
                 neighbouringGlassBlocks.clear();
                 visitedBlocks.clear();
-                neighbouringGlassBlocks.add(new Pair<>(pos, 0));
-                visitedBlocks.add(pos);
-                checkNeighbors(facing, neighbouringGlassBlocks, pos, world);
+                neighbouringGlassBlocks.add(new Tuple<>(worldPosition, 0));
+                visitedBlocks.add(worldPosition);
+                checkNeighbors(facing, neighbouringGlassBlocks, worldPosition, world);
 
-                if (!world.isClient) {
-                    createPortal((ServerWorld) world);
+                if (!world.isClientSide) {
+                    createPortal((ServerLevel) world);
                 }
             }
 
@@ -286,7 +285,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             } else {
                 fadeoutTime = 0;
 
-                if (portal != null && !world.isClient) {
+                if (portal != null && !world.isClientSide) {
                     portal.remove(Entity.RemovalReason.DISCARDED);
                     portal = null;
                 }
@@ -298,28 +297,28 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 case NORTH -> true;
                 default -> false;
             };
-            boundingBox.addSquares(this.getPos(), portal, Math.max(targetDistance, 0), shouldFlip);
+            boundingBox.addSquares(this.getBlockPos(), portal, Math.max(targetDistance, 0), shouldFlip);
             portal.reloadAndSyncToClient();
         }
     }
 
-    private void checkNeighbors(Direction plane, ArrayList<Pair<BlockPos, Integer>> map, BlockPos currentPos, World world) {
+    private void checkNeighbors(Direction plane, ArrayList<Tuple<BlockPos, Integer>> map, BlockPos currentPos, Level world) {
         Direction[] directionsToCheck = getDirections(plane);
-        Queue<Pair<BlockPos, Integer>> queue = new LinkedList<>();
+        Queue<Tuple<BlockPos, Integer>> queue = new LinkedList<>();
         Set<BlockPos> visitedBlocks = new HashSet<>(); // Ensure you have a Set to track visited blocks
-        queue.add(new Pair<>(currentPos, 0));
+        queue.add(new Tuple<>(currentPos, 0));
         visitedBlocks.add(currentPos);
 
         while (!queue.isEmpty()) {
-            Pair<BlockPos, Integer> current = queue.poll();
-            BlockPos pos = current.getLeft();
-            int currentDistance = current.getRight();
+            Tuple<BlockPos, Integer> current = queue.poll();
+            BlockPos pos = current.getA();
+            int currentDistance = current.getB();
 
             for (Direction direction : directionsToCheck) {
-                BlockPos neighborPos = pos.offset(direction);
+                BlockPos neighborPos = pos.relative(direction);
                 if (!visitedBlocks.contains(neighborPos) && world.getBlockState(neighborPos).getBlock().equals(Blocks.GLASS)) {
                     visitedBlocks.add(neighborPos);
-                    Pair<BlockPos, Integer> neighborPair = new Pair<>(neighborPos, currentDistance + 1);
+                    Tuple<BlockPos, Integer> neighborPair = new Tuple<>(neighborPos, currentDistance + 1);
                     map.add(neighborPair);
                     queue.add(neighborPair);
 

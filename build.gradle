@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'fabric-loom' version '1.13.6'
     id 'maven-publish'
 }
 
@@ -20,17 +20,20 @@ repositories {
         name = 'BlameJared Maven (CrT / Bookshelf)'
         url = 'https://maven.blamejared.com'
     }
-    maven { url 'https://jitpack.io' }
+    maven {
+        name = 'JitPack'
+        url = 'https://jitpack.io'
+    }
     maven {
         name = 'Ladysnake'
         url = 'https://maven.ladysnake.org/releases'
     }
     maven {
-        name = "CottonMC"
-        url = "https://server.bbkr.space/artifactory/libs-release"
-    }
-    maven {
-        url 'https://jitpack.io'
+        name = 'AlexIIL'
+        url = 'https://staging.alexiil.uk/maven/'
+        content {
+            includeGroup 'io.github.cottonmc'
+        }
     }
     maven {
         url 'https://maven.shedaniel.me'
@@ -56,7 +59,7 @@ loom {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     // Fabric API. This is technically optional, but you probably want it anyway.
@@ -85,7 +88,7 @@ processResources {
     }
 }
 
-def targetJavaVersion = 17
+def targetJavaVersion = 21
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
     // this fixes some edge cases with special characters not displaying correctly

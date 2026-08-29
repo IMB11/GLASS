@@ -2,12 +2,12 @@ package dev.imb11.client.gui;
 
 import io.github.cottonmc.cotton.gui.widget.TooltipBuilder;
 import io.github.cottonmc.cotton.gui.widget.WButton;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public class WButtonTooltip extends WButton {
-    public Text[] tooltips;
+    public Component[] tooltips;
 
-    public void setTooltip(Text... tooltip) {
+    public void setTooltip(Component... tooltip) {
         tooltips = tooltip;
     }
 

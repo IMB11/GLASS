@@ -3,19 +3,19 @@ package dev.imb11.sync.packets;
 import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 
-public record C2SCreateChannelPacket(String channel) implements CustomPayload, ServerPlayNetworking.PlayPayloadHandler<C2SCreateChannelPacket> {
-    public static final CustomPayload.Id<C2SCreateChannelPacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("glass", "create_channel"));
-    public static final PacketCodec<RegistryByteBuf, C2SCreateChannelPacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
-        buf.writeString(value.channel());
-    }, (buf) -> new C2SCreateChannelPacket(buf.readString()));
+public record C2SCreateChannelPacket(String channel) implements CustomPacketPayload, ServerPlayNetworking.PlayPayloadHandler<C2SCreateChannelPacket> {
+    public static final CustomPacketPayload.Type<C2SCreateChannelPacket> PACKET_ID = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("glass", "create_channel"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, C2SCreateChannelPacket> PACKET_CODEC = StreamCodec.ofMember((value, buf) -> {
+        buf.writeUtf(value.channel());
+    }, (buf) -> new C2SCreateChannelPacket(buf.readUtf()));
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
 
@@ -25,7 +25,7 @@ public record C2SCreateChannelPacket(String channel) implements CustomPayload, S
 
         var player = context.player();
 
-        var channelManager = ChannelManagerPersistence.get(player.getWorld());
+        var channelManager = ChannelManagerPersistence.get(player.level());
 
         channelManager.add(new Channel(channel, null));
     }

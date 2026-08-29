@@ -7,18 +7,18 @@ import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.block.TerminalBlockEntityRenderer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 
 public class GBlocks {
-    public static final TerminalBlock TERMINAL = new TerminalBlock(AbstractBlock.Settings.copy(Blocks.OBSIDIAN));
-    public static final ProjectorBlock PROJECTOR = new ProjectorBlock(AbstractBlock.Settings.copy(Blocks.BEACON));
+    public static final TerminalBlock TERMINAL = new TerminalBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.OBSIDIAN));
+    public static final ProjectorBlock PROJECTOR = new ProjectorBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.BEACON));
 //    public static final ProjectionBlock PROJECTION_PANEL = new ProjectionBlock(AbstractBlock.Settings.copy(Blocks.GLASS));
 
     public static void init() {
@@ -26,22 +26,22 @@ public class GBlocks {
         register("projector", PROJECTOR);
 //        register("projection_panel", PROJECTION_PANEL);
 
-        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "terminal_entity"), TerminalBlockEntity.BLOCK_ENTITY_TYPE);
-        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "projector_entity"), ProjectorBlockEntity.BLOCK_ENTITY_TYPE);
-//        Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of("glass", "projection_entity"), ProjectionBlockBase.BLOCK_ENTITY_TYPE);
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "terminal_entity"), TerminalBlockEntity.BLOCK_ENTITY_TYPE);
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "projector_entity"), ProjectorBlockEntity.BLOCK_ENTITY_TYPE);
+//        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "projection_entity"), ProjectionBlockBase.BLOCK_ENTITY_TYPE);
 
-        Registry.register(Registries.SCREEN_HANDLER, Identifier.of("glass", "terminal_gui"), TerminalBlockGUI.SCREEN_HANDLER_TYPE);
-        Registry.register(Registries.SCREEN_HANDLER, Identifier.of("glass", "projector_gui"), ProjectorBlockGUI.SCREEN_HANDLER_TYPE);
+        Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath("glass", "terminal_gui"), TerminalBlockGUI.SCREEN_HANDLER_TYPE);
+        Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath("glass", "projector_gui"), ProjectorBlockGUI.SCREEN_HANDLER_TYPE);
     }
 
     public static void initClient() {
-        BlockEntityRendererFactories.register(TerminalBlockEntity.BLOCK_ENTITY_TYPE, TerminalBlockEntityRenderer::new);
-        BlockEntityRendererFactories.register(ProjectorBlockEntity.BLOCK_ENTITY_TYPE, ProjectorBlockEntityRenderer::new);
+        BlockEntityRenderers.register(TerminalBlockEntity.BLOCK_ENTITY_TYPE, TerminalBlockEntityRenderer::new);
+        BlockEntityRenderers.register(ProjectorBlockEntity.BLOCK_ENTITY_TYPE, ProjectorBlockEntityRenderer::new);
 
-        BlockRenderLayerMap.INSTANCE.putBlock(PROJECTOR, RenderLayer.getCutout());
+        BlockRenderLayerMap.INSTANCE.putBlock(PROJECTOR, RenderType.cutout());
     }
 
     private static <T extends Block> T register(String id, T block) {
-        return Registry.register(Registries.BLOCK, Identifier.of("glass", id), block);
+        return Registry.register(BuiltInRegistries.BLOCK, ResourceLocation.fromNamespaceAndPath("glass", id), block);
     }
 }

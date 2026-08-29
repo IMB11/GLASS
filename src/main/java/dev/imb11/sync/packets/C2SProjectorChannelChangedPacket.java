@@ -2,21 +2,21 @@ package dev.imb11.sync.packets;
 
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 
-public record C2SProjectorChannelChangedPacket(BlockPos pos, String channel) implements CustomPayload, ServerPlayNetworking.PlayPayloadHandler<C2SProjectorChannelChangedPacket> {
-    public static final CustomPayload.Id<C2SProjectorChannelChangedPacket> PACKET_ID = new CustomPayload.Id<>(Identifier.of("glass", "projector_channel_changed"));
-    public static final PacketCodec<RegistryByteBuf, C2SProjectorChannelChangedPacket> PACKET_CODEC = PacketCodec.of((value, buf) -> {
+public record C2SProjectorChannelChangedPacket(BlockPos pos, String channel) implements CustomPacketPayload, ServerPlayNetworking.PlayPayloadHandler<C2SProjectorChannelChangedPacket> {
+    public static final CustomPacketPayload.Type<C2SProjectorChannelChangedPacket> PACKET_ID = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("glass", "projector_channel_changed"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, C2SProjectorChannelChangedPacket> PACKET_CODEC = StreamCodec.ofMember((value, buf) -> {
         buf.writeBlockPos(value.pos());
-        buf.writeString(value.channel());
-    }, (buf) -> new C2SProjectorChannelChangedPacket(buf.readBlockPos(), buf.readString()));
+        buf.writeUtf(value.channel());
+    }, (buf) -> new C2SProjectorChannelChangedPacket(buf.readBlockPos(), buf.readUtf()));
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return PACKET_ID;
     }
 
@@ -28,12 +28,12 @@ public record C2SProjectorChannelChangedPacket(BlockPos pos, String channel) imp
         var player = context.player();
         var server = context.server();
 
-        server.executeSync(() -> {
-            var entity = player.getWorld().getBlockEntity(pos);
+        server.executeIfPossible(() -> {
+            var entity = player.level().getBlockEntity(pos);
 
             if (entity instanceof ProjectorBlockEntity projector) {
                 projector.channel = channel;
-                projector.markDirty();
+                projector.setChanged();
             }
         });
     }

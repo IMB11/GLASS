@@ -1,8 +1,5 @@
 package dev.imb11.util;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
 import qouteall.imm_ptl.core.portal.GeometryPortalShape;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.shape.BoxPortalShape;
@@ -12,15 +9,18 @@ import qouteall.q_misc_util.my_util.Mesh2D;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
-import static net.minecraft.util.math.Direction.*;
+import static net.minecraft.core.Direction.*;
 
 public class BoundingBox2D {
     public float min1, min2;
     public float max1, max2;
     private final Direction facing;
     private final int fixedCoord;
-    private final HashMap<Vec3d, Integer> distanceMap = new HashMap<>();
+    private final HashMap<Vec3, Integer> distanceMap = new HashMap<>();
 
     @Override
     public String toString() {
@@ -37,7 +37,7 @@ public class BoundingBox2D {
     public void addSquares(BlockPos projectorPos, Portal portal, int targetDistance, boolean flip) {
         var shape = new Mesh2D();
         for (var entry : new ArrayList<>(distanceMap.entrySet()) {{
-            this.add(new HashMap.SimpleEntry<>(Vec3d.of(projectorPos), 0));
+            this.add(new HashMap.SimpleEntry<>(Vec3.atLowerCornerOf(projectorPos), 0));
         }}) {
             var pos = entry.getKey();
             var distance = entry.getValue();
@@ -135,7 +135,7 @@ public class BoundingBox2D {
                 return;
         }
 
-        this.distanceMap.put(Vec3d.of(pos), distance);
+        this.distanceMap.put(Vec3.atLowerCornerOf(pos), distance);
 
         min1 = Math.min(min1, coord1);
         max1 = Math.max(max1, coord1);
@@ -159,19 +159,19 @@ public class BoundingBox2D {
         return fixedCoord;
     }
 
-    public static Vec3d getRelativeUpVector(Direction direction) {
+    public static Vec3 getRelativeUpVector(Direction direction) {
         return switch (direction) {
-            case NORTH, SOUTH, EAST, WEST -> Vec3d.of(UP.getVector());
-            case UP -> Vec3d.of(Direction.NORTH.getVector());
-            case DOWN -> Vec3d.of(SOUTH.getVector());
+            case NORTH, SOUTH, EAST, WEST -> Vec3.atLowerCornerOf(UP.getNormal());
+            case UP -> Vec3.atLowerCornerOf(Direction.NORTH.getNormal());
+            case DOWN -> Vec3.atLowerCornerOf(SOUTH.getNormal());
         };
     }
 
-    public Vec3d getMidpoint() {
+    public Vec3 getMidpoint() {
         return switch (this.facing) {
-            case NORTH, SOUTH -> new Vec3d(min1 + getWidth() / 2, min2 + getHeight() / 2, this.facing == SOUTH ? fixedCoord + 1 : fixedCoord);
-            case UP, DOWN -> new Vec3d(min1 + getWidth() / 2, this.facing == UP ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2);
-            case EAST, WEST -> new Vec3d(this.facing == EAST ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2, min1 + getWidth() / 2);
+            case NORTH, SOUTH -> new Vec3(min1 + getWidth() / 2, min2 + getHeight() / 2, this.facing == SOUTH ? fixedCoord + 1 : fixedCoord);
+            case UP, DOWN -> new Vec3(min1 + getWidth() / 2, this.facing == UP ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2);
+            case EAST, WEST -> new Vec3(this.facing == EAST ? fixedCoord + 1 : fixedCoord, min2 + getHeight() / 2, min1 + getWidth() / 2);
         };
     }
 }

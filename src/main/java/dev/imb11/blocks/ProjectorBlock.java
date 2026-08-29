@@ -3,97 +3,96 @@ package dev.imb11.blocks;
 import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.BooleanProperty;
-import net.minecraft.state.property.DirectionProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-public class ProjectorBlock extends BlockWithEntity {
+public class ProjectorBlock extends BaseEntityBlock {
 
-    public static final BooleanProperty POWERED = Properties.POWERED;
-    public static final DirectionProperty FACING = Properties.FACING;
+    public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final DirectionProperty FACING = BlockStateProperties.FACING;
 
-    public ProjectorBlock(Settings settings) {
+    public ProjectorBlock(Properties settings) {
         super(settings);
-        setDefaultState(getDefaultState().with(POWERED, false));
+        registerDefaultState(defaultBlockState().setValue(POWERED, false));
     }
 
     @Override
-    protected MapCodec<? extends BlockWithEntity> getCodec() {
+    protected MapCodec<? extends BaseEntityBlock> codec() {
         return null;
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING, POWERED);
     }
 
     @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ProjectorBlockEntity(pos, state);
     }
 
     @Override
-    public void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
-        if (world.isReceivingRedstonePower(pos)) {
-            world.playSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.BLOCKS, 1.5f, 0.2f, true);
-            setDefaultState(state.with(POWERED, true));
+    public void neighborChanged(BlockState state, Level world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
+        if (world.hasNeighborSignal(pos)) {
+            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
+            registerDefaultState(state.setValue(POWERED, true));
         } else {
             // Play a sound
-            world.playSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BLOCK_BEACON_DEACTIVATE, SoundCategory.BLOCKS, 1.5f, 0.2f, true);
-            setDefaultState(state.with(POWERED, false));
+            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
+            registerDefaultState(state.setValue(POWERED, false));
         }
 
-        super.neighborUpdate(state, world, pos, sourceBlock, sourcePos, notify);
+        super.neighborChanged(state, world, pos, sourceBlock, sourcePos, notify);
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+    public InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
         // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
-        // such as the one from BlockWithEntity
+        // such as the one from BaseEntityBlock
 
-        if (world.isClient) {
-            return ActionResult.PASS;
+        if (world.isClientSide) {
+            return InteractionResult.PASS;
         }
 
-        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.createScreenHandlerFactory(world, pos);
+        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.getMenuProvider(world, pos);
 
-        player.openHandledScreen(handlerFactory);
+        player.openMenu(handlerFactory);
 
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
     }
 
     @Nullable
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        return this.getDefaultState().with(FACING, ctx.getPlayerLookDirection().getOpposite());
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        return this.defaultBlockState().setValue(FACING, ctx.getNearestLookingDirection().getOpposite());
     }
 
     @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        return BlockWithEntity.validateTicker(type, ProjectorBlockEntity.BLOCK_ENTITY_TYPE, ProjectorBlockEntity::tick);
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level world, BlockState state, BlockEntityType<T> type) {
+        return BaseEntityBlock.createTickerHelper(type, ProjectorBlockEntity.BLOCK_ENTITY_TYPE, ProjectorBlockEntity::tick);
     }
 }

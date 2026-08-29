@@ -4,11 +4,11 @@ import dev.imb11.sync.packets.*;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public class GNetworking {
-    private static Identifier id(String id) {
-        return Identifier.of("glass", id);
+    private static ResourceLocation id(String id) {
+        return ResourceLocation.fromNamespaceAndPath("glass", id);
     }
 
     public static void initialize() {

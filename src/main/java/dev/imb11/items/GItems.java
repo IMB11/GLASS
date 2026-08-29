@@ -4,16 +4,16 @@ import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Item;
 
 public class GItems {
-    public static final BlockItem TERMINAL = new BlockItem(GBlocks.TERMINAL, new Item.Settings());
-    public static final BlockItem PROJECTOR = new BlockItem(GBlocks.PROJECTOR, new Item.Settings());
+    public static final BlockItem TERMINAL = new BlockItem(GBlocks.TERMINAL, new Item.Properties());
+    public static final BlockItem PROJECTOR = new BlockItem(GBlocks.PROJECTOR, new Item.Properties());
 //    public static final BlockItem PROJECTION_PANEL = new BlockItem(GBlocks.PROJECTION_PANEL, new FabricItemSettings());
 
     public static void init() {
@@ -21,9 +21,9 @@ public class GItems {
         register("projector", PROJECTOR);
 //        register("projection_panel", PROJECTION_PANEL);
 
-        ItemGroupEvents.modifyEntriesEvent(ItemGroups.REDSTONE).register(entries -> {
-            entries.add(TERMINAL);
-            entries.add(PROJECTOR);
+        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(entries -> {
+            entries.accept(TERMINAL);
+            entries.accept(PROJECTOR);
         });
     }
 
@@ -32,6 +32,6 @@ public class GItems {
     }
 
     private static <T extends Item> T register(String id, T item) {
-        return Registry.register(Registries.ITEM, Identifier.of(Glass.MOD_ID, id), item);
+        return Registry.register(BuiltInRegistries.ITEM, ResourceLocation.fromNamespaceAndPath(Glass.MOD_ID, id), item);
     }
 }
