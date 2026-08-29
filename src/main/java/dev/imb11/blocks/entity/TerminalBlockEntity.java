@@ -61,7 +61,7 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
 
     @Override
     public Component getDisplayName() {
-        // Using the block name as the screen title
+
         return Component.literal("G.L.A.S.S Terminal");
     }
 

@@ -1,10 +1,9 @@
 package dev.imb11.client.renderer.block;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
+import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.world.ProjectorRenderingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
@@ -17,15 +16,11 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 
 import java.util.Objects;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
-
-    public RenderTarget framebuffer;
-
     public ProjectorBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {}
 
     private static float interpolateRotation(float prevRotation, float nextRotation, float partialTick) {
@@ -43,7 +38,6 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         return prevRotation + partialTick * f3;
     }
-
 
     @Override
     public void render(ProjectorBlockEntity entity, float tickDelta, PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
@@ -84,19 +78,25 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         matrices.popPose();
 
-        int maxDistance = entity.furthestBlock + 3;
-
-        // Render the world onto the facing direction.
-        if (framebuffer == null) {
-            framebuffer = new TextureTarget(512, 512, true, Minecraft.ON_OSX);
+        boolean screenIsRevealing = !entity.neighbouringGlassBlocks.isEmpty()
+                && (entity.active || entity.targetDistance >= 0);
+        if (!screenIsRevealing) {
+            return;
         }
 
-        matrices.pushPose();
-        ProjectorRenderingHelper.renderEdgePanels(Vec3.atLowerCornerOf(entity.getBlockPos()), matrices, direction, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
-        matrices.popPose();
+        ProjectionRenderManager.requestFrame();
 
-//        matrices.push();
-//        ProjectorRenderingHelper.renderWorldFramebuffer(new BlockPos(20, -58, 4), framebuffer, matrices, facing, entity.neighbouringGlassBlocks, entity.targetDistance, maxDistance);
-//        matrices.pop();
+        matrices.pushPose();
+        if (ProjectionRenderManager.isReady()) {
+            ProjectorRenderingHelper.renderProjectionSurface(
+                    matrices,
+                    vertexConsumers,
+                    direction,
+                    entity.neighbouringGlassBlocks,
+                    entity.targetDistance,
+                    ProjectionRenderManager.textureLocation()
+            );
+        }
+        matrices.popPose();
     }
 }

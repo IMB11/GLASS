@@ -14,12 +14,10 @@ import net.minecraft.world.item.Item;
 public class GItems {
     public static final BlockItem TERMINAL = new BlockItem(GBlocks.TERMINAL, new Item.Properties());
     public static final BlockItem PROJECTOR = new BlockItem(GBlocks.PROJECTOR, new Item.Properties());
-//    public static final BlockItem PROJECTION_PANEL = new BlockItem(GBlocks.PROJECTION_PANEL, new FabricItemSettings());
 
     public static void init() {
         register("terminal", TERMINAL);
         register("projector", PROJECTOR);
-//        register("projection_panel", PROJECTION_PANEL);
 
         ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(entries -> {
             entries.accept(TERMINAL);

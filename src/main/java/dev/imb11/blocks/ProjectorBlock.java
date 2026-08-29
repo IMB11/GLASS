@@ -56,7 +56,7 @@ public class ProjectorBlock extends BaseEntityBlock {
             world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
             registerDefaultState(state.setValue(POWERED, true));
         } else {
-            // Play a sound
+
             world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
             registerDefaultState(state.setValue(POWERED, false));
         }
@@ -66,8 +66,6 @@ public class ProjectorBlock extends BaseEntityBlock {
 
     @Override
     public InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
-        // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
-        // such as the one from BaseEntityBlock
 
         if (world.isClientSide) {
             return InteractionResult.PASS;

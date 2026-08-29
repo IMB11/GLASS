@@ -43,8 +43,6 @@ public class TerminalBlock extends BaseEntityBlock {
         return new TerminalBlockEntity(pos, state);
     }
 
-
-
     @Override
     public BlockState playerWillDestroy(Level world, BlockPos pos, BlockState state, Player player) {
         super.playerWillDestroy(world, pos, state, player);
@@ -67,8 +65,6 @@ public class TerminalBlock extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
-        // You need a Block.createScreenHandlerFactory implementation that delegates to the block entity,
-        // such as the one from BaseEntityBlock
 
         if (world.isClientSide) {
             return InteractionResult.PASS;

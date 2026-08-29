@@ -71,11 +71,6 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         ArrayList<WButtonTooltip> channelButtons = new ArrayList<>();
 
-//        WPortalFrame previewFrame = new WPortalFrame(this.world.dimension(), new Vec3(pos.getX(), pos.getY(), pos.getZ()));
-//
-//        root.add(previewFrame, (WIDTH/2), 120, (WIDTH/2) - 5, HEIGHT - 120 - 5);
-        // Doesn't work
-
         WListPanel<Channel, WButtonTooltip> channelList = new WListPanel<>(channels, WButtonTooltip::new, (Channel channel, WButtonTooltip btn) -> {
 
             btn.setOnClick(() -> {

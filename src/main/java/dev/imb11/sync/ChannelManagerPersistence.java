@@ -192,9 +192,6 @@ public class ChannelManagerPersistence extends SavedData implements Collection<C
         return CHANNELS.values().parallelStream();
     }
 
-    /**
-     * @Deprecated Do not use.
-     */
     @Override
     public void clear() {
         CHANNELS.clear();

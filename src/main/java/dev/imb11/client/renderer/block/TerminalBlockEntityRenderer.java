@@ -29,8 +29,6 @@ public class TerminalBlockEntityRenderer implements BlockEntityRenderer<Terminal
 
         matrices.pushPose();
 
-//        matrices.translate(0.25f, 0.5f-(0.25f/2f), 0.80f);
-
         float scale = 0.25f;
 
         matrices.translate(0.5, 0.5, 0.5);

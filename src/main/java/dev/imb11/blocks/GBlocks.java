@@ -19,16 +19,13 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 public class GBlocks {
     public static final TerminalBlock TERMINAL = new TerminalBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.OBSIDIAN));
     public static final ProjectorBlock PROJECTOR = new ProjectorBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.BEACON));
-//    public static final ProjectionBlock PROJECTION_PANEL = new ProjectionBlock(AbstractBlock.Settings.copy(Blocks.GLASS));
 
     public static void init() {
         register("terminal", TERMINAL);
         register("projector", PROJECTOR);
-//        register("projection_panel", PROJECTION_PANEL);
 
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "terminal_entity"), TerminalBlockEntity.BLOCK_ENTITY_TYPE);
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "projector_entity"), ProjectorBlockEntity.BLOCK_ENTITY_TYPE);
-//        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("glass", "projection_entity"), ProjectionBlockBase.BLOCK_ENTITY_TYPE);
 
         Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath("glass", "terminal_gui"), TerminalBlockGUI.SCREEN_HANDLER_TYPE);
         Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath("glass", "projector_gui"), ProjectorBlockGUI.SCREEN_HANDLER_TYPE);
