@@ -12,6 +12,8 @@
         "LevelRendererInvoker",
         "LevelRendererMixin",
         "MinecraftMixin",
+        "RenderChunkRegionMixin",
+        "RenderRegionCacheMixin",
         "SectionRenderDispatcherRenderSectionMixin",
         "VertexBufferMixin",
         "ViewAreaInvoker"

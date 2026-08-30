@@ -3,6 +3,7 @@ package dev.imb11.client.renderer.projection;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 
 public final class ProjectionRenderContext {
@@ -24,6 +25,11 @@ public final class ProjectionRenderContext {
     public static RenderTarget target() {
         State state = ACTIVE.get();
         return state == null ? null : state.target;
+    }
+
+    public static BlockPos hiddenTerrainBlock() {
+        State state = ACTIVE.get();
+        return state == null ? null : state.hiddenTerrainBlock;
     }
 
     public static double cameraX(LevelRenderer renderer, Entity fallback) {
@@ -49,13 +55,16 @@ public final class ProjectionRenderContext {
         return isActiveRenderer(renderer) ? feedRenderDistance(configuredDistance) : configuredDistance;
     }
 
-    public static Scope enter(LevelRenderer renderer, Camera camera, RenderTarget target) {
+    public static Scope enter(LevelRenderer renderer, Camera camera, RenderTarget target, BlockPos hiddenTerrainBlock) {
         State previous = ACTIVE.get();
-        ACTIVE.set(new State(renderer, camera, target));
+        ACTIVE.set(new State(renderer, camera, target, hiddenTerrainBlock));
         return new Scope(previous);
     }
 
-    private record State(LevelRenderer renderer, Camera camera, RenderTarget target) {
+    private record State(LevelRenderer renderer, Camera camera, RenderTarget target, BlockPos hiddenTerrainBlock) {
+        private State {
+            hiddenTerrainBlock = hiddenTerrainBlock == null ? null : hiddenTerrainBlock.immutable();
+        }
     }
 
     public static final class Scope implements AutoCloseable {

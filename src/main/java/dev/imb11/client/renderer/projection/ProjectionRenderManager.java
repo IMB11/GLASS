@@ -76,6 +76,7 @@ public final class ProjectionRenderManager {
     private static final float CAMERA_FACE_OFFSET = 0.5625F;
     private static final double PROJECTOR_PLANE_OFFSET = 0.502D;
     private static final double DESTINATION_CLIP_OFFSET = 0.002D;
+    private static final float CLIP_EPSILON = 1.0E-5F;
     private static final double SIDE_EPSILON = 1.0E-7D;
     private static final double DISTANCE_EPSILON = SIDE_EPSILON * SIDE_EPSILON;
     private static final double CROSSING_EPSILON = 1.0E-6D;
@@ -548,7 +549,12 @@ public final class ProjectionRenderManager {
                 feed.renderBuffers
         );
         feed.level = level;
-        try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(feed.renderer, feed.camera, feed.target)) {
+        try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(
+                feed.renderer,
+                feed.camera,
+                feed.target,
+                feed.source.pos()
+        )) {
             feed.renderer.setLevel(level);
         }
         feed.textureProxy = new ProjectionTargetTexture(feed);
@@ -608,7 +614,12 @@ public final class ProjectionRenderManager {
         RenderSystem.disableBlend();
 
         LevelRendererInvoker invoker = (LevelRendererInvoker) renderer;
-        try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(renderer, feed.camera, target)) {
+        try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(
+                renderer,
+                feed.camera,
+                target,
+                feed.source.pos()
+        )) {
             RenderSystem.setShader(GameRenderer::getPositionShader);
             renderer.renderSky(
                     modelView,
@@ -997,7 +1008,27 @@ public final class ProjectionRenderManager {
                 -cameraPlaneNormal.dot(cameraPlanePoint)
         );
         Matrix4f result = new Matrix4f(projection);
+        if (cameraPlane.w >= -CLIP_EPSILON) {
+            return result;
+        }
         Matrix4f inverseProjection = new Matrix4f(projection).invert();
+        for (int x = -1; x <= 1; x += 2) {
+            for (int y = -1; y <= 1; y += 2) {
+                Vector4f corner = new Vector4f(x, y, 1.0F, 1.0F);
+                inverseProjection.transform(corner);
+                if (!isFinite(corner) || Math.abs(corner.w) <= CLIP_EPSILON) {
+                    return result;
+                }
+                corner.div(corner.w);
+                float planeValue = cameraPlane.x * corner.x
+                        + cameraPlane.y * corner.y
+                        + cameraPlane.z * corner.z
+                        + cameraPlane.w;
+                if (!Float.isFinite(planeValue) || planeValue <= CLIP_EPSILON) {
+                    return result;
+                }
+            }
+        }
         float denominator = Float.NEGATIVE_INFINITY;
         for (int x = -1; x <= 1; x += 2) {
             for (int y = -1; y <= 1; y += 2) {
