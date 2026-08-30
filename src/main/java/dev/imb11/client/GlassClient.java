@@ -6,6 +6,7 @@ import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.client.gui.ProjectorBlockScreen;
 import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.client.gui.TerminalBlockScreen;
+import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import dev.imb11.sync.packets.S2CChannelSnapshotPacket;
@@ -31,6 +32,7 @@ public class GlassClient implements ClientModInitializer {
         GBlocks.initClient();
         CoreShaderRegistrationCallback.EVENT.register(GlassClient::registerProjectionShader);
         InvalidateRenderStateCallback.EVENT.register(ProjectionSurfaceRenderer::invalidate);
+        InvalidateRenderStateCallback.EVENT.register(ProjectorBlockEntityRenderer::reset);
         ClientPlayNetworking.registerGlobalReceiver(
                 S2CChannelSnapshotPacket.PACKET_ID,
                 (packet, context) -> ClientProjectionSourceRegistry.applySnapshot(packet)
@@ -41,9 +43,17 @@ public class GlassClient implements ClientModInitializer {
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) ->
                 ProjectionRenderManager.onClientChunkUnloaded(level, chunk.getPos())
         );
+        ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, level) -> {
+            if (blockEntity instanceof ProjectorBlockEntity projector) {
+                ProjectorBlockEntityRenderer.registerLoaded(level, projector);
+            }
+        });
         ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((blockEntity, level) -> {
             if (blockEntity instanceof ProjectorBlockEntity projector) {
+                ProjectorBlockEntityRenderer.unregisterLoaded(level, projector);
                 ProjectionSurfaceRenderer.release(level, projector.getBlockPos());
+                ProjectorBlockEntityRenderer.release(level, projector.getBlockPos());
+                ProjectionRenderManager.releaseProjector(level, projector.getBlockPos());
             }
         });
 
@@ -53,6 +63,7 @@ public class GlassClient implements ClientModInitializer {
 
     private static void registerProjectionShader(CoreShaderRegistrationCallback.RegistrationContext context) throws IOException {
         ProjectionRenderManager.reset();
+        ProjectorBlockEntityRenderer.reset();
         ProjectionSurfaceRenderer.registerShader(context);
     }
 
@@ -66,10 +77,12 @@ public class GlassClient implements ClientModInitializer {
         activeLevel = currentLevel;
         if (previousLevel != null) {
             ProjectionSurfaceRenderer.releaseLevel(previousLevel);
+            ProjectorBlockEntityRenderer.releaseLevel(previousLevel);
         }
         if (currentLevel == null) {
             ProjectionRenderManager.reset();
         } else {
+            ProjectorBlockEntityRenderer.onMainRendererRebuilt(minecraft.levelRenderer);
             ProjectionRenderManager.onClientLevelChanged(currentLevel);
         }
     }
@@ -79,5 +92,7 @@ public class GlassClient implements ClientModInitializer {
         ClientProjectionSourceRegistry.clear();
         ProjectionRenderManager.reset();
         ProjectionSurfaceRenderer.reset();
+        ProjectorBlockEntityRenderer.reset();
+        ProjectorBlockEntityRenderer.clearLoaded();
     }
 }

@@ -1,5 +1,6 @@
 package dev.imb11.mixins;
 
+import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.projection.ProjectionRenderContext;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import net.minecraft.client.Minecraft;
@@ -107,6 +108,7 @@ abstract class LevelRendererMixin {
 
     @Inject(method = "allChanged", at = @At("TAIL"))
     private void glass$mirrorMainRendererRebuild(CallbackInfo callbackInfo) {
+        ProjectorBlockEntityRenderer.onMainRendererRebuilt((LevelRenderer) (Object) this);
         ProjectionRenderManager.onMainRendererRebuilt((LevelRenderer) (Object) this);
     }
 

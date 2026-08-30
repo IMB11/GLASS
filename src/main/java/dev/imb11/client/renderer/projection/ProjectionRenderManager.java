@@ -43,6 +43,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
@@ -75,6 +76,9 @@ public final class ProjectionRenderManager {
     private static final float CAMERA_FACE_OFFSET = 0.5625F;
     private static final double PROJECTOR_PLANE_OFFSET = 0.502D;
     private static final double DESTINATION_CLIP_OFFSET = 0.002D;
+    private static final double SIDE_EPSILON = 1.0E-7D;
+    private static final double DISTANCE_EPSILON = SIDE_EPSILON * SIDE_EPSILON;
+    private static final double CROSSING_EPSILON = 1.0E-6D;
     private static final RenderType[] TERRAIN_LAYERS = {
             RenderType.solid(),
             RenderType.cutoutMipped(),
@@ -83,6 +87,7 @@ public final class ProjectionRenderManager {
             RenderType.tripwire()
     };
     private static final Map<FeedKey, ProjectionFeed> FEEDS = new LinkedHashMap<>();
+    private static final Map<ProjectionOwner, PortalSideState> PORTAL_SIDES = new HashMap<>();
     private static final List<SectionBufferBuilderPool> RETIRED_BUFFER_POOLS = new ArrayList<>();
     private static Map<String, ProjectionSource> registrySources = Map.of();
     private static ClientLevel activeLevel;
@@ -113,6 +118,9 @@ public final class ProjectionRenderManager {
         }
 
         ProjectionView view = ProjectionView.create(currentLevel.dimension(), projectorPos, surface);
+        PortalSideState sideState = portalSideState(view);
+        preparePortalSide(sideState, view, minecraft.gameRenderer.getMainCamera().getPosition());
+        updatePortalSide(sideState, minecraft.gameRenderer.getMainCamera().getPosition());
         FeedKey key = new FeedKey(source.key(), view.dimension(), view.projectorPos());
         Iterator<Map.Entry<FeedKey, ProjectionFeed>> iterator = FEEDS.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -131,7 +139,7 @@ public final class ProjectionRenderManager {
             feed = null;
         }
         if (feed == null) {
-            feed = new ProjectionFeed(key, source, view, nextTextureLocation());
+            feed = new ProjectionFeed(key, source, view, sideState, nextTextureLocation());
             FEEDS.put(key, feed);
         } else if (!feed.view.equals(view)) {
             feed.view = view;
@@ -150,6 +158,32 @@ public final class ProjectionRenderManager {
                 && feed.ready
                 && feed.target != null
                 && feed.target.getColorTextureId() > 0;
+    }
+
+    public static long currentFrameSequence() {
+        return frameSequence;
+    }
+
+    public static void trackViewer(
+            ClientLevel level,
+            BlockPos projectorPos,
+            ProjectionSurface surface,
+            Vec3 viewerPosition
+    ) {
+        RenderSystem.assertOnRenderThread();
+        if (activeLevel != level) {
+            changeLevelNow(level);
+        }
+        ProjectionView view = ProjectionView.create(level.dimension(), projectorPos, surface);
+        PortalSideState sideState = portalSideState(view);
+        preparePortalSide(sideState, view, viewerPosition);
+        updatePortalSide(sideState, viewerPosition);
+    }
+
+    public static void releaseProjector(ClientLevel level, BlockPos projectorPos) {
+        BlockPos immutablePos = projectorPos.immutable();
+        ResourceKey<Level> dimension = level.dimension();
+        runOnRenderThread(() -> releaseProjectorNow(dimension, immutablePos));
     }
 
     public static boolean isProjectionRenderer(LevelRenderer candidate) {
@@ -261,12 +295,14 @@ public final class ProjectionRenderManager {
         RenderTarget mainTarget = minecraft.getMainRenderTarget();
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(true);
         Camera viewerCamera = gameRenderer.getMainCamera();
+        Vec3 viewerPosition = viewerCamera.getPosition();
         Matrix4f mainProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         Matrix4f mainModelView = new Matrix4f(RenderSystem.getModelViewMatrix());
         boolean initializedFeedThisFrame = false;
         Iterator<Map.Entry<FeedKey, ProjectionFeed>> iterator = FEEDS.entrySet().iterator();
         while (iterator.hasNext()) {
             ProjectionFeed feed = iterator.next().getValue();
+            updatePortalSide(feed.sideState, viewerPosition);
             long requestAge = frameSequence - feed.lastRequestFrame;
             if (feed.lastRequestFrame < 0L || requestAge > FEED_RETENTION_GRACE_FRAMES) {
                 iterator.remove();
@@ -442,11 +478,26 @@ public final class ProjectionRenderManager {
         return new ChunkPos(sectionX, sectionZ);
     }
 
+    private static void releaseProjectorNow(ResourceKey<Level> dimension, BlockPos projectorPos) {
+        Iterator<Map.Entry<FeedKey, ProjectionFeed>> iterator = FEEDS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<FeedKey, ProjectionFeed> entry = iterator.next();
+            FeedKey key = entry.getKey();
+            if (key.projectorDimension().equals(dimension) && key.projectorPos().equals(projectorPos)) {
+                iterator.remove();
+                closeFeed(entry.getValue());
+            }
+        }
+        PORTAL_SIDES.remove(new ProjectionOwner(dimension, projectorPos));
+        drainRetiredBufferPools();
+    }
+
     private static void changeLevelNow(@Nullable ClientLevel level) {
         for (ProjectionFeed feed : FEEDS.values()) {
             closeFeed(feed);
         }
         FEEDS.clear();
+        PORTAL_SIDES.clear();
         activeLevel = level;
         drainRetiredBufferPools();
     }
@@ -456,6 +507,7 @@ public final class ProjectionRenderManager {
             closeFeed(feed);
         }
         FEEDS.clear();
+        PORTAL_SIDES.clear();
         activeLevel = null;
         frameSequence = 0L;
         drainRetiredBufferPools();
@@ -623,7 +675,9 @@ public final class ProjectionRenderManager {
         Vec3 projectorAnchor = Vec3.atCenterOf(view.projectorPos())
                 .add(surfaceNormal.scale(PROJECTOR_PLANE_OFFSET));
         Vec3 viewerOffset = viewerCamera.getPosition().subtract(projectorAnchor);
-        double side = viewerOffset.dot(surfaceNormal) < 0.0D ? -1.0D : 1.0D;
+        double side = feed.sideState.portalSide == 0.0D
+                ? classifyPortalSide(view, viewerCamera.getPosition())
+                : feed.sideState.portalSide;
         Vec3 sourceRight = directionVector(view.uDirection()).scale(side);
         Vec3 sourceUp = directionVector(view.vDirection());
         Vec3 sourceBack = surfaceNormal.scale(side);
@@ -695,6 +749,226 @@ public final class ProjectionRenderManager {
 
     private static Vec3 directionVector(Direction direction) {
         return new Vec3(direction.getStepX(), direction.getStepY(), direction.getStepZ());
+    }
+
+    private static PortalSideState portalSideState(ProjectionView view) {
+        ProjectionOwner owner = new ProjectionOwner(view.dimension(), view.projectorPos());
+        return PORTAL_SIDES.computeIfAbsent(owner, ignored -> new PortalSideState());
+    }
+
+    private static void preparePortalSide(
+            PortalSideState sideState,
+            ProjectionView view,
+            Vec3 viewerPosition
+    ) {
+        ProjectionView previousView = sideState.view;
+        if (view.equals(previousView)) {
+            return;
+        }
+        boolean rootFrameChanged = previousView != null
+                && (previousView.facing() != view.facing() || !previousView.origin().equals(view.origin()));
+        sideState.view = view;
+        sideState.lastViewerPosition = pointOnSurface(view, viewerPosition) ? null : viewerPosition;
+        sideState.lastUpdateFrame = Long.MIN_VALUE;
+        if (rootFrameChanged) {
+            sideState.portalSide = 0.0D;
+            sideState.lastViewerPosition = null;
+        }
+    }
+
+    private static void updatePortalSide(PortalSideState sideState, Vec3 viewerPosition) {
+        if (sideState.lastUpdateFrame == frameSequence) {
+            return;
+        }
+        sideState.lastUpdateFrame = frameSequence;
+        ProjectionView view = sideState.view;
+        if (view == null) {
+            return;
+        }
+        if (sideState.portalSide == 0.0D) {
+            if (pointOnSurface(view, viewerPosition)) {
+                sideState.lastViewerPosition = null;
+                return;
+            }
+            sideState.portalSide = classifyPortalSide(view, viewerPosition);
+            sideState.lastViewerPosition = viewerPosition;
+            return;
+        }
+
+        if (pointOnSurface(view, viewerPosition)) {
+            return;
+        }
+        Vec3 previousPosition = sideState.lastViewerPosition;
+        sideState.lastViewerPosition = viewerPosition;
+        if (previousPosition == null || previousPosition.distanceToSqr(viewerPosition) <= SIDE_EPSILON * SIDE_EPSILON) {
+            return;
+        }
+        if (!segmentIntersectsBounds(view.bounds(), previousPosition, viewerPosition)) {
+            return;
+        }
+        if ((countSurfaceCrossings(view, previousPosition, viewerPosition) & 1) != 0) {
+            sideState.portalSide = -sideState.portalSide;
+        }
+    }
+
+    private static double classifyPortalSide(ProjectionView view, Vec3 viewerPosition) {
+        double closestDistance = Double.POSITIVE_INFINITY;
+        double closestSignedDistance = 0.0D;
+        for (ProjectionSurface.Face face : view.faces()) {
+            double distance = distanceToFaceSquared(face, viewerPosition);
+            double signedDistance = signedFaceDistance(face, viewerPosition);
+            if (distance < closestDistance - DISTANCE_EPSILON
+                    || (Math.abs(distance - closestDistance) <= DISTANCE_EPSILON
+                    && signedDistance > closestSignedDistance)) {
+                closestDistance = distance;
+                closestSignedDistance = signedDistance;
+            }
+        }
+        if (closestDistance == Double.POSITIVE_INFINITY) {
+            Vec3 normal = directionVector(view.facing());
+            Vec3 anchor = Vec3.atCenterOf(view.projectorPos()).add(normal.scale(PROJECTOR_PLANE_OFFSET));
+            closestSignedDistance = viewerPosition.subtract(anchor).dot(normal);
+        }
+        return closestSignedDistance < 0.0D ? -1.0D : 1.0D;
+    }
+
+    private static boolean pointOnSurface(ProjectionView view, Vec3 point) {
+        if (!view.bounds().contains(point)
+                || (!nearInteger(point.x) && !nearInteger(point.y) && !nearInteger(point.z))) {
+            return false;
+        }
+        for (ProjectionSurface.Face face : view.faces()) {
+            if (Math.abs(signedFaceDistance(face, point)) <= SIDE_EPSILON
+                    && pointWithinFace(face, point.x, point.y, point.z)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean nearInteger(double value) {
+        return Math.abs(value - Math.rint(value)) <= SIDE_EPSILON;
+    }
+
+    private static double distanceToFaceSquared(ProjectionSurface.Face face, Vec3 point) {
+        BlockPos position = face.position();
+        Direction.Axis axis = face.normal().getAxis();
+        double x = clamp(point.x, position.getX(), position.getX() + 1.0D);
+        double y = clamp(point.y, position.getY(), position.getY() + 1.0D);
+        double z = clamp(point.z, position.getZ(), position.getZ() + 1.0D);
+        double plane = facePlane(face);
+        switch (axis) {
+            case X -> x = plane;
+            case Y -> y = plane;
+            case Z -> z = plane;
+        }
+        double dx = point.x - x;
+        double dy = point.y - y;
+        double dz = point.z - z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    private static double signedFaceDistance(ProjectionSurface.Face face, Vec3 point) {
+        double coordinate = coordinate(point, face.normal().getAxis());
+        double direction = face.normal().getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0D : -1.0D;
+        return (coordinate - facePlane(face)) * direction;
+    }
+
+    private static int countSurfaceCrossings(ProjectionView view, Vec3 start, Vec3 end) {
+        double dx = end.x - start.x;
+        double dy = end.y - start.y;
+        double dz = end.z - start.z;
+        List<Double> parameters = new ArrayList<>();
+        for (ProjectionSurface.Face face : view.faces()) {
+            Direction.Axis axis = face.normal().getAxis();
+            double delta = switch (axis) {
+                case X -> dx;
+                case Y -> dy;
+                case Z -> dz;
+            };
+            if (Math.abs(delta) <= SIDE_EPSILON) {
+                continue;
+            }
+            double startCoordinate = coordinate(start, axis);
+            double parameter = (facePlane(face) - startCoordinate) / delta;
+            if (parameter <= SIDE_EPSILON || parameter > 1.0D + SIDE_EPSILON) {
+                continue;
+            }
+            double x = start.x + dx * parameter;
+            double y = start.y + dy * parameter;
+            double z = start.z + dz * parameter;
+            if (pointWithinFace(face, x, y, z)) {
+                parameters.add(parameter);
+            }
+        }
+        parameters.sort(Double::compare);
+        int crossings = 0;
+        double segmentLength = Math.sqrt(start.distanceToSqr(end));
+        double parameterOffset = Math.min(
+                0.25D,
+                Math.max(CROSSING_EPSILON * 4.0D, 1.0E-4D / segmentLength)
+        );
+        int index = 0;
+        while (index < parameters.size()) {
+            double parameter = parameters.get(index);
+            int next = index + 1;
+            while (next < parameters.size() && parameters.get(next) - parameter <= CROSSING_EPSILON) {
+                next++;
+            }
+            Vec3 before = pointAlongSegment(start, end, parameter - parameterOffset);
+            Vec3 after = pointAlongSegment(start, end, parameter + parameterOffset);
+            if (classifyPortalSide(view, before) != classifyPortalSide(view, after)) {
+                crossings++;
+            }
+            index = next;
+        }
+        return crossings;
+    }
+
+    private static Vec3 pointAlongSegment(Vec3 start, Vec3 end, double parameter) {
+        return new Vec3(
+                Mth.lerp(parameter, start.x, end.x),
+                Mth.lerp(parameter, start.y, end.y),
+                Mth.lerp(parameter, start.z, end.z)
+        );
+    }
+
+    private static boolean pointWithinFace(ProjectionSurface.Face face, double x, double y, double z) {
+        BlockPos position = face.position();
+        return switch (face.normal().getAxis()) {
+            case X -> withinFaceCoordinate(y, position.getY()) && withinFaceCoordinate(z, position.getZ());
+            case Y -> withinFaceCoordinate(x, position.getX()) && withinFaceCoordinate(z, position.getZ());
+            case Z -> withinFaceCoordinate(x, position.getX()) && withinFaceCoordinate(y, position.getY());
+        };
+    }
+
+    private static boolean withinFaceCoordinate(double value, int minimum) {
+        return value >= minimum - SIDE_EPSILON && value <= minimum + 1.0D + SIDE_EPSILON;
+    }
+
+    private static boolean segmentIntersectsBounds(AABB bounds, Vec3 start, Vec3 end) {
+        return bounds.contains(start) || bounds.contains(end) || bounds.clip(start, end).isPresent();
+    }
+
+    private static double facePlane(ProjectionSurface.Face face) {
+        int coordinate = switch (face.normal().getAxis()) {
+            case X -> face.position().getX();
+            case Y -> face.position().getY();
+            case Z -> face.position().getZ();
+        };
+        return coordinate + (face.normal().getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0D : 0.0D);
+    }
+
+    private static double coordinate(Vec3 point, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> point.x;
+            case Y -> point.y;
+            case Z -> point.z;
+        };
+    }
+
+    private static double clamp(double value, double minimum, double maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private static Matrix4f clippedProjection(
@@ -1055,6 +1329,12 @@ public final class ProjectionRenderManager {
         }
     }
 
+    private record ProjectionOwner(ResourceKey<Level> dimension, BlockPos projectorPos) {
+        private ProjectionOwner {
+            projectorPos = projectorPos.immutable();
+        }
+    }
+
     private record ProjectionView(
             ResourceKey<Level> dimension,
             BlockPos projectorPos,
@@ -1062,7 +1342,8 @@ public final class ProjectionRenderManager {
             Direction facing,
             Direction uDirection,
             Direction vDirection,
-            ProjectionSurface.Bounds bounds,
+            List<ProjectionSurface.Face> faces,
+            AABB bounds,
             long topologyHash,
             long version
     ) {
@@ -1083,7 +1364,8 @@ public final class ProjectionRenderManager {
                     surface.facing(),
                     surface.uDirection(),
                     surface.vDirection(),
-                    surface.bounds(),
+                    surface.faces(),
+                    surface.renderBounds(),
                     surface.topologyHash(),
                     surface.version()
             );
@@ -1108,11 +1390,19 @@ public final class ProjectionRenderManager {
         }
     }
 
+    private static final class PortalSideState {
+        private ProjectionView view;
+        private Vec3 lastViewerPosition;
+        private double portalSide;
+        private long lastUpdateFrame = Long.MIN_VALUE;
+    }
+
     public static final class ProjectionFeed {
         private final FeedKey key;
         private final ProjectionSource source;
         private final ResourceLocation textureLocation;
         private final ProjectionCamera camera = new ProjectionCamera();
+        private final PortalSideState sideState;
         private ProjectionView view;
         private Vec3 cameraPosition;
         private long lastRequestFrame = -1L;
@@ -1131,11 +1421,13 @@ public final class ProjectionRenderManager {
                 FeedKey key,
                 ProjectionSource source,
                 ProjectionView view,
+                PortalSideState sideState,
                 ResourceLocation textureLocation
         ) {
             this.key = key;
             this.source = source;
             this.view = view;
+            this.sideState = sideState;
             this.textureLocation = textureLocation;
             this.cameraPosition = ProjectionRenderManager.cameraPosition(source);
         }

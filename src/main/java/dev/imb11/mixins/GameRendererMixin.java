@@ -1,5 +1,6 @@
 package dev.imb11.mixins;
 
+import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import net.minecraft.client.DeltaTracker;
@@ -27,11 +28,14 @@ abstract class GameRendererMixin {
     private void glass$resetProjectionRenderer(CallbackInfo callbackInfo) {
         ProjectionRenderManager.reset();
         ProjectionSurfaceRenderer.reset();
+        ProjectorBlockEntityRenderer.reset();
     }
 
     @Inject(method = "close", at = @At("HEAD"))
     private void glass$closeProjectionRenderer(CallbackInfo callbackInfo) {
         ProjectionRenderManager.reset();
         ProjectionSurfaceRenderer.reset();
+        ProjectorBlockEntityRenderer.reset();
+        ProjectorBlockEntityRenderer.clearLoaded();
     }
 }

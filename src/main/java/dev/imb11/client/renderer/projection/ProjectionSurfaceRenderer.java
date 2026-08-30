@@ -21,8 +21,11 @@ import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class ProjectionSurfaceRenderer {
@@ -179,13 +182,24 @@ public final class ProjectionSurfaceRenderer {
     }
 
     private static CachedMesh build(ProjectionSurface surface) {
-        if (surface.cells().isEmpty()) {
+        if (surface.faces().isEmpty()) {
             return null;
         }
-        for (ProjectionSurface.Cell cell : surface.cells()) {
-            int revealDistance = cell.revealDistance();
+        for (ProjectionSurface.Face face : surface.faces()) {
+            int revealDistance = face.revealDistance();
             if (revealDistance < 0 || revealDistance > MAX_ENCODED_DISTANCE) {
                 throw new IllegalArgumentException("Projection reveal distance is outside the 24-bit mesh range");
+            }
+        }
+
+        List<FaceGeometry> faceGeometries = new ArrayList<>(surface.faces().size());
+        Map<EdgeKey, EnumSet<Direction>> edgeNormals = new HashMap<>();
+        for (ProjectionSurface.Face face : surface.faces()) {
+            FaceGeometry geometry = geometry(surface, face);
+            faceGeometries.add(geometry);
+            for (EdgeKey edge : geometry.edges()) {
+                edgeNormals.computeIfAbsent(edge, ignored -> EnumSet.noneOf(Direction.class))
+                        .add(face.normal());
             }
         }
 
@@ -193,8 +207,8 @@ public final class ProjectionSurfaceRenderer {
                 VertexFormat.Mode.QUADS,
                 DefaultVertexFormat.POSITION_TEX_COLOR
         );
-        for (ProjectionSurface.Cell cell : surface.cells()) {
-            emitCell(builder, surface, cell);
+        for (FaceGeometry geometry : faceGeometries) {
+            emitFace(builder, geometry, edgeNormals);
         }
 
         VertexBuffer vertexBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
@@ -218,70 +232,110 @@ public final class ProjectionSurfaceRenderer {
         );
     }
 
-    private static void emitCell(
-            VertexConsumer vertices,
+    private static FaceGeometry geometry(
             ProjectionSurface surface,
-            ProjectionSurface.Cell cell
+            ProjectionSurface.Face face
     ) {
-        BlockPos relativePos = cell.position().subtract(surface.origin());
-        int revealDistance = cell.revealDistance();
+        BlockPos relativePos = face.position().subtract(surface.origin());
+        IntegerCorner[] corners = {
+                corner(relativePos, face.normal(), face.uDirection(), face.vDirection(), false, false),
+                corner(relativePos, face.normal(), face.uDirection(), face.vDirection(), true, false),
+                corner(relativePos, face.normal(), face.uDirection(), face.vDirection(), true, true),
+                corner(relativePos, face.normal(), face.uDirection(), face.vDirection(), false, true)
+        };
+        EdgeKey[] edges = {
+                new EdgeKey(corners[0], corners[1]),
+                new EdgeKey(corners[1], corners[2]),
+                new EdgeKey(corners[2], corners[3]),
+                new EdgeKey(corners[3], corners[0])
+        };
+        return new FaceGeometry(face, corners, edges);
+    }
+
+    private static IntegerCorner corner(
+            BlockPos relativePos,
+            Direction normal,
+            Direction uDirection,
+            Direction vDirection,
+            boolean highU,
+            boolean highV
+    ) {
+        int x = relativePos.getX() + Math.max(0, normal.getStepX());
+        int y = relativePos.getY() + Math.max(0, normal.getStepY());
+        int z = relativePos.getZ() + Math.max(0, normal.getStepZ());
+        int uOffset = cornerOffset(uDirection, highU);
+        int vOffset = cornerOffset(vDirection, highV);
+        x += Math.abs(uDirection.getStepX()) * uOffset + Math.abs(vDirection.getStepX()) * vOffset;
+        y += Math.abs(uDirection.getStepY()) * uOffset + Math.abs(vDirection.getStepY()) * vOffset;
+        z += Math.abs(uDirection.getStepZ()) * uOffset + Math.abs(vDirection.getStepZ()) * vOffset;
+        return new IntegerCorner(x, y, z);
+    }
+
+    private static void emitFace(
+            VertexConsumer vertices,
+            FaceGeometry geometry,
+            Map<EdgeKey, EnumSet<Direction>> edgeNormals
+    ) {
+        ProjectionSurface.Face face = geometry.face();
+        int revealDistance = face.revealDistance();
         int red = revealDistance & 0xFF;
         int green = revealDistance >>> 8 & 0xFF;
         int blue = revealDistance >>> 16 & 0xFF;
-        emitVertex(
-                vertices, relativePos, surface.facing(), surface.uDirection(), surface.vDirection(),
-                false, false, (float) cell.u0(), (float) cell.v0(), red, green, blue
-        );
-        emitVertex(
-                vertices, relativePos, surface.facing(), surface.uDirection(), surface.vDirection(),
-                true, false, (float) cell.u1(), (float) cell.v0(), red, green, blue
-        );
-        emitVertex(
-                vertices, relativePos, surface.facing(), surface.uDirection(), surface.vDirection(),
-                true, true, (float) cell.u1(), (float) cell.v1(), red, green, blue
-        );
-        emitVertex(
-                vertices, relativePos, surface.facing(), surface.uDirection(), surface.vDirection(),
-                false, true, (float) cell.u0(), (float) cell.v1(), red, green, blue
-        );
+        for (int index = 0; index < geometry.corners().length; index++) {
+            EdgeKey previousEdge = geometry.edges()[(index + geometry.edges().length - 1) % geometry.edges().length];
+            EdgeKey nextEdge = geometry.edges()[index];
+            float u = index == 1 || index == 2 ? 1.0F : 0.0F;
+            float v = index >= 2 ? 1.0F : 0.0F;
+            emitVertex(
+                    vertices,
+                    geometry.corners()[index],
+                    face.normal(),
+                    edgeNormals.get(previousEdge),
+                    edgeNormals.get(nextEdge),
+                    u,
+                    v,
+                    red,
+                    green,
+                    blue
+            );
+        }
     }
 
     private static void emitVertex(
             VertexConsumer vertices,
-            BlockPos relativePos,
-            Direction facing,
-            Direction uDirection,
-            Direction vDirection,
-            boolean highU,
-            boolean highV,
+            IntegerCorner corner,
+            Direction normal,
+            EnumSet<Direction> previousEdgeNormals,
+            EnumSet<Direction> nextEdgeNormals,
             float u,
             float v,
             int red,
             int green,
             int blue
     ) {
-        float[] position = {relativePos.getX(), relativePos.getY(), relativePos.getZ()};
-        position[axisIndex(facing.getAxis())] += facing.getAxisDirection() == Direction.AxisDirection.POSITIVE
-                ? 1.0F + SURFACE_OFFSET
-                : -SURFACE_OFFSET;
-        position[axisIndex(uDirection.getAxis())] += cornerOffset(uDirection, highU);
-        position[axisIndex(vDirection.getAxis())] += cornerOffset(vDirection, highV);
-        vertices.addVertex(position[0], position[1], position[2])
+        EnumSet<Direction> miterNormals = EnumSet.of(normal);
+        if (previousEdgeNormals != null) {
+            miterNormals.addAll(previousEdgeNormals);
+        }
+        if (nextEdgeNormals != null) {
+            miterNormals.addAll(nextEdgeNormals);
+        }
+        float x = corner.x();
+        float y = corner.y();
+        float z = corner.z();
+        for (Direction miterNormal : miterNormals) {
+            x += miterNormal.getStepX() * SURFACE_OFFSET;
+            y += miterNormal.getStepY() * SURFACE_OFFSET;
+            z += miterNormal.getStepZ() * SURFACE_OFFSET;
+        }
+        vertices.addVertex(x, y, z)
                 .setUv(u, v)
                 .setColor(red, green, blue, 255);
     }
 
-    private static float cornerOffset(Direction direction, boolean high) {
+    private static int cornerOffset(Direction direction, boolean high) {
         boolean positive = direction.getAxisDirection() == Direction.AxisDirection.POSITIVE;
-        return positive == high ? 1.0F : 0.0F;
-    }
-
-    private static int axisIndex(Direction.Axis axis) {
-        return switch (axis) {
-            case X -> 0;
-            case Y -> 1;
-            case Z -> 2;
-        };
+        return positive == high ? 1 : 0;
     }
 
     private static void releaseNow(ClientLevel level, BlockPos projectorPos) {
@@ -354,6 +408,35 @@ public final class ProjectionSurfaceRenderer {
         @Override
         public void close() {
             vertexBuffer.close();
+        }
+    }
+
+    private record FaceGeometry(
+            ProjectionSurface.Face face,
+            IntegerCorner[] corners,
+            EdgeKey[] edges
+    ) {
+    }
+
+    private record IntegerCorner(int x, int y, int z) implements Comparable<IntegerCorner> {
+        @Override
+        public int compareTo(IntegerCorner other) {
+            int xComparison = Integer.compare(x, other.x);
+            if (xComparison != 0) {
+                return xComparison;
+            }
+            int yComparison = Integer.compare(y, other.y);
+            return yComparison != 0 ? yComparison : Integer.compare(z, other.z);
+        }
+    }
+
+    private record EdgeKey(IntegerCorner first, IntegerCorner second) {
+        private EdgeKey {
+            if (first.compareTo(second) > 0) {
+                IntegerCorner swap = first;
+                first = second;
+                second = swap;
+            }
         }
     }
 }

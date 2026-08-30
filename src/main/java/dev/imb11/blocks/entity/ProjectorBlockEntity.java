@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -176,7 +177,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     private void ensureProjectionSurface(Level world, Direction facing) {
         boolean facingChanged = projectionSurface != null && projectionSurface.facing() != facing;
-        if (projectionSurface != null && projectionSurface.isTopologyValid(facing, position -> world.getBlockState(position).is(Blocks.GLASS))) {
+        ProjectionSurface.BlockQuery query = position -> sampleBlock(world, position);
+        if (projectionSurface != null && projectionSurface.isTopologyValid(facing, query)) {
             return;
         }
 
@@ -185,12 +187,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 worldPosition,
                 facing,
                 nextVersion,
-                position -> world.getBlockState(position).is(Blocks.GLASS)
+                query
         );
-        if (projectionSurface != null
-                && projectionSurface.facing() == rebuilt.facing()
-                && projectionSurface.topologyHash() == rebuilt.topologyHash()
-                && projectionSurface.cells().equals(rebuilt.cells())) {
+        if (projectionSurface != null && projectionSurface.hasSameTopology(rebuilt)) {
+            projectionSurface = rebuilt.withVersion(projectionSurface.version());
             return;
         }
 
@@ -202,6 +202,17 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
             revealDistance = Math.min(revealDistance, rebuilt.completedRevealDistance());
         }
         setChanged();
+    }
+
+    private static ProjectionSurface.BlockSample sampleBlock(Level world, BlockPos position) {
+        int chunkX = SectionPos.blockToSectionCoord(position.getX());
+        int chunkZ = SectionPos.blockToSectionCoord(position.getZ());
+        if (!world.getChunkSource().hasChunk(chunkX, chunkZ)) {
+            return ProjectionSurface.BlockSample.UNLOADED;
+        }
+        return world.getBlockState(position).is(Blocks.GLASS)
+                ? ProjectionSurface.BlockSample.GLASS
+                : ProjectionSurface.BlockSample.OTHER;
     }
 
     @Nullable
