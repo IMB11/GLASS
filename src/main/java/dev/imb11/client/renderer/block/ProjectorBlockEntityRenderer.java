@@ -3,9 +3,11 @@ package dev.imb11.client.renderer.block;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
+import dev.imb11.client.ClientProjectionSourceRegistry;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import dev.imb11.projection.ProjectionSurface;
+import dev.imb11.sync.ProjectionSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
@@ -85,13 +87,21 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
             return;
         }
 
-        ProjectionRenderManager.requestFrame();
-
-        if (ProjectionRenderManager.isReady() && entity.getLevel() instanceof ClientLevel clientLevel) {
+        if (entity.getLevel() instanceof ClientLevel clientLevel) {
+            ProjectionSource source = ClientProjectionSourceRegistry.resolve(entity.getChannel());
+            ProjectionRenderManager.ProjectionFeed feed = ProjectionRenderManager.requestFeed(
+                    source,
+                    entity.getBlockPos(),
+                    surface
+            );
+            if (feed == null || !feed.isReady()) {
+                return;
+            }
             ProjectionSurfaceRenderer.render(
                     clientLevel,
                     entity.getBlockPos(),
                     surface,
+                    feed,
                     matrices,
                     entity.getRevealDistance()
             );

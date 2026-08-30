@@ -14,23 +14,29 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
+
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     public static final int FADEOUT_TIME_MAX = 12;
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
     public int fadeoutTime = 12;
     public boolean active = false;
-    public String channel = "";
+    private String channel = "";
     public float rotationBeacon, rotationBeaconPrev;
 
     private ProjectionSurface projectionSurface;
@@ -80,6 +86,34 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         projectionSurfaceVersion = Math.max(0L, tag.getLong("projectionSurfaceVersion"));
 
         super.loadAdditional(tag, registryLookup);
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannelFromServer(String channel) {
+        String value = Objects.requireNonNull(channel);
+        if (this.channel.equals(value)) {
+            return;
+        }
+        this.channel = value;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            BlockState state = getBlockState();
+            level.sendBlockUpdated(worldPosition, state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registryLookup) {
+        return saveWithoutMetadata(registryLookup);
     }
 
     @Override

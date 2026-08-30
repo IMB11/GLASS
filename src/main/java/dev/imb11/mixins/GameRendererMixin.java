@@ -4,7 +4,6 @@ import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.LightTexture;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,7 +15,7 @@ abstract class GameRendererMixin {
             method = "renderLevel",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/LightTexture;updateLightTexture(F)V",
+                    target = "Lnet/minecraft/client/renderer/GameRenderer;resetProjectionMatrix(Lorg/joml/Matrix4f;)V",
                     shift = At.Shift.AFTER
             )
     )

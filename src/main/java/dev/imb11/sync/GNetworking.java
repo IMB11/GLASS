@@ -1,15 +1,27 @@
 package dev.imb11.sync;
 
-import dev.imb11.sync.packets.*;
+import dev.imb11.blocks.GBlocks;
+import dev.imb11.blocks.entity.ProjectorBlockEntity;
+import dev.imb11.blocks.entity.TerminalBlockEntity;
+import dev.imb11.client.gui.ProjectorBlockGUI;
+import dev.imb11.client.gui.TerminalBlockGUI;
+import dev.imb11.sync.packets.C2SCreateChannelPacket;
+import dev.imb11.sync.packets.C2SDeleteChannelPacket;
+import dev.imb11.sync.packets.C2SProjectorChannelChangedPacket;
+import dev.imb11.sync.packets.C2SRemoveLinkedChannelPacket;
+import dev.imb11.sync.packets.C2STerminalChannelChangedPacket;
+import dev.imb11.sync.packets.S2CChannelSnapshotPacket;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
-public class GNetworking {
-    private static ResourceLocation id(String id) {
-        return ResourceLocation.fromNamespaceAndPath("glass", id);
-    }
+public final class GNetworking {
+    private static final double MAX_INTERACTION_DISTANCE_SQUARED = 64.0D;
 
     public static void initialize() {
         PayloadTypeRegistry.playC2S().register(C2SCreateChannelPacket.PACKET_ID, C2SCreateChannelPacket.PACKET_CODEC);
@@ -17,14 +29,59 @@ public class GNetworking {
         PayloadTypeRegistry.playC2S().register(C2STerminalChannelChangedPacket.PACKET_ID, C2STerminalChannelChangedPacket.PACKET_CODEC);
         PayloadTypeRegistry.playC2S().register(C2SRemoveLinkedChannelPacket.PACKET_ID, C2SRemoveLinkedChannelPacket.PACKET_CODEC);
         PayloadTypeRegistry.playC2S().register(C2SProjectorChannelChangedPacket.PACKET_ID, C2SProjectorChannelChangedPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SPopulateDefaultChannelPacket.PACKET_ID, C2SPopulateDefaultChannelPacket.PACKET_CODEC);
+        PayloadTypeRegistry.playS2C().register(S2CChannelSnapshotPacket.PACKET_ID, S2CChannelSnapshotPacket.PACKET_CODEC);
 
-        ServerPlayNetworking.registerGlobalReceiver(C2SCreateChannelPacket.PACKET_ID, new C2SCreateChannelPacket(null));
-        ServerPlayNetworking.registerGlobalReceiver(C2SDeleteChannelPacket.PACKET_ID, new C2SDeleteChannelPacket(null));
-        ServerPlayNetworking.registerGlobalReceiver(C2STerminalChannelChangedPacket.PACKET_ID, new C2STerminalChannelChangedPacket(null, null));
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoveLinkedChannelPacket.PACKET_ID, new C2SRemoveLinkedChannelPacket(null));
-        ServerPlayNetworking.registerGlobalReceiver(C2SProjectorChannelChangedPacket.PACKET_ID, new C2SProjectorChannelChangedPacket(null, null));
-        ServerPlayNetworking.registerGlobalReceiver(C2SPopulateDefaultChannelPacket.PACKET_ID, new C2SPopulateDefaultChannelPacket());
+        ServerPlayNetworking.registerGlobalReceiver(C2SCreateChannelPacket.PACKET_ID, C2SCreateChannelPacket::receive);
+        ServerPlayNetworking.registerGlobalReceiver(C2SDeleteChannelPacket.PACKET_ID, C2SDeleteChannelPacket::receive);
+        ServerPlayNetworking.registerGlobalReceiver(C2STerminalChannelChangedPacket.PACKET_ID, C2STerminalChannelChangedPacket::receive);
+        ServerPlayNetworking.registerGlobalReceiver(C2SRemoveLinkedChannelPacket.PACKET_ID, C2SRemoveLinkedChannelPacket::receive);
+        ServerPlayNetworking.registerGlobalReceiver(C2SProjectorChannelChangedPacket.PACKET_ID, C2SProjectorChannelChangedPacket::receive);
 
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendSnapshot(handler.getPlayer()));
+        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> sendSnapshot(player));
+    }
+
+    public static void sendSnapshot(ServerPlayer player) {
+        if (ServerPlayNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
+            ServerPlayNetworking.send(player, ChannelManagerPersistence.get(player.serverLevel().getServer()).snapshotPacket());
+        }
+    }
+
+    public static void broadcastSnapshot(MinecraftServer server, ChannelManagerPersistence persistence) {
+        S2CChannelSnapshotPacket snapshot = persistence.snapshotPacket();
+        for (ServerPlayer player : PlayerLookup.all(server)) {
+            if (ServerPlayNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
+                ServerPlayNetworking.send(player, snapshot);
+            }
+        }
+    }
+
+    public static boolean canUseTerminal(ServerPlayer player, BlockPos pos) {
+        if (!(player.containerMenu instanceof TerminalBlockGUI menu) || !menu.isFor(pos)) {
+            return false;
+        }
+        return validTarget(player, pos, true);
+    }
+
+    public static boolean canUseProjector(ServerPlayer player, BlockPos pos) {
+        if (!(player.containerMenu instanceof ProjectorBlockGUI menu) || !menu.isFor(pos)) {
+            return false;
+        }
+        return validTarget(player, pos, false);
+    }
+
+    private static boolean validTarget(ServerPlayer player, BlockPos pos, boolean terminal) {
+        var level = player.serverLevel();
+        if (!level.hasChunkAt(pos)
+                || player.distanceToSqr(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) > MAX_INTERACTION_DISTANCE_SQUARED) {
+            return false;
+        }
+        if (terminal) {
+            return level.getBlockState(pos).is(GBlocks.TERMINAL) && level.getBlockEntity(pos) instanceof TerminalBlockEntity;
+        }
+        return level.getBlockState(pos).is(GBlocks.PROJECTOR) && level.getBlockEntity(pos) instanceof ProjectorBlockEntity;
+    }
+
+    private GNetworking() {
     }
 }

@@ -31,33 +31,12 @@ public final class ProjectionSurfaceRenderer {
     private static final ResourceLocation SHADER_LOCATION =
             ResourceLocation.fromNamespaceAndPath("glass", "projection_surface");
     private static final Map<ClientLevel, Map<BlockPos, CachedMesh>> CACHED_MESHES = new IdentityHashMap<>();
+    private static final Map<ResourceLocation, RenderType> SURFACE_TYPES = new HashMap<>();
     private static ClientLevel activeLevel;
     private static volatile ShaderInstance shader;
     private static volatile Uniform revealProgressUniform;
     private static final RenderStateShard.ShaderStateShard PROJECTION_SURFACE_SHADER =
             new RenderStateShard.ShaderStateShard(() -> shader);
-    private static final RenderType PROJECTION_SURFACE_TYPE = RenderType.create(
-            "glass_projection_surface",
-            DefaultVertexFormat.POSITION_TEX_COLOR,
-            VertexFormat.Mode.QUADS,
-            1536,
-            false,
-            false,
-            RenderType.CompositeState.builder()
-                    .setShaderState(PROJECTION_SURFACE_SHADER)
-                    .setTextureState(new RenderStateShard.TextureStateShard(
-                            ProjectionRenderManager.PROJECTION_TEXTURE,
-                            true,
-                            false
-                    ))
-                    .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
-                    .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .setLightmapState(RenderStateShard.NO_LIGHTMAP)
-                    .setOverlayState(RenderStateShard.NO_OVERLAY)
-                    .setWriteMaskState(RenderStateShard.COLOR_DEPTH_WRITE)
-                    .createCompositeState(false)
-    );
 
     private ProjectionSurfaceRenderer() {
     }
@@ -74,13 +53,17 @@ public final class ProjectionSurfaceRenderer {
             ClientLevel level,
             BlockPos projectorPos,
             ProjectionSurface surface,
+            ProjectionRenderManager.ProjectionFeed feed,
             PoseStack matrices,
             float revealProgress
     ) {
         RenderSystem.assertOnRenderThread();
         ShaderInstance currentShader = shader;
         Uniform currentRevealProgressUniform = revealProgressUniform;
-        int textureId = ProjectionRenderManager.colorTextureId();
+        if (!ProjectionRenderManager.isReady(feed)) {
+            return;
+        }
+        int textureId = feed.colorTextureId();
         if (currentShader == null || currentRevealProgressUniform == null || textureId <= 0) {
             return;
         }
@@ -90,8 +73,7 @@ public final class ProjectionSurfaceRenderer {
             return;
         }
 
-        currentShader.setSampler("Sampler0", textureId);
-        currentRevealProgressUniform.set(revealProgress);
+        RenderType surfaceType = getSurfaceType(feed.textureLocation());
 
         matrices.pushPose();
         try {
@@ -100,7 +82,9 @@ public final class ProjectionSurfaceRenderer {
             boolean renderStateStarted = false;
             try {
                 renderStateStarted = true;
-                PROJECTION_SURFACE_TYPE.setupRenderState();
+                surfaceType.setupRenderState();
+                currentShader.setSampler("Sampler0", textureId);
+                currentRevealProgressUniform.set(revealProgress);
                 cachedMesh.vertexBuffer.bind();
                 Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix())
                         .mul(matrices.last().pose());
@@ -112,7 +96,7 @@ public final class ProjectionSurfaceRenderer {
             } finally {
                 VertexBuffer.unbind();
                 if (renderStateStarted) {
-                    PROJECTION_SURFACE_TYPE.clearRenderState();
+                    surfaceType.clearRenderState();
                 }
             }
         } finally {
@@ -136,10 +120,35 @@ public final class ProjectionSurfaceRenderer {
         runOnRenderThread(ProjectionSurfaceRenderer::resetNow);
     }
 
+    static void releaseTexture(ResourceLocation textureLocation) {
+        SURFACE_TYPES.remove(textureLocation);
+    }
+
     private static void onShaderLoaded(ShaderInstance loadedShader) {
         resetNow();
         shader = loadedShader;
         revealProgressUniform = loadedShader.getUniform("RevealProgress");
+    }
+
+    private static RenderType getSurfaceType(ResourceLocation textureLocation) {
+        return SURFACE_TYPES.computeIfAbsent(textureLocation, location -> RenderType.create(
+                "glass_projection_surface_" + location.getPath().replace('/', '_'),
+                DefaultVertexFormat.POSITION_TEX_COLOR,
+                VertexFormat.Mode.QUADS,
+                1536,
+                false,
+                false,
+                RenderType.CompositeState.builder()
+                        .setShaderState(PROJECTION_SURFACE_SHADER)
+                        .setTextureState(new RenderStateShard.TextureStateShard(location, true, false))
+                        .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
+                        .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
+                        .setCullState(RenderStateShard.NO_CULL)
+                        .setLightmapState(RenderStateShard.NO_LIGHTMAP)
+                        .setOverlayState(RenderStateShard.NO_OVERLAY)
+                        .setWriteMaskState(RenderStateShard.COLOR_DEPTH_WRITE)
+                        .createCompositeState(false)
+        ));
     }
 
     private static CachedMesh getOrBuild(ClientLevel level, BlockPos projectorPos, ProjectionSurface surface) {
@@ -302,6 +311,7 @@ public final class ProjectionSurfaceRenderer {
     private static void resetNow() {
         CACHED_MESHES.values().forEach(levelMeshes -> levelMeshes.values().forEach(CachedMesh::close));
         CACHED_MESHES.clear();
+        SURFACE_TYPES.clear();
         activeLevel = null;
     }
 

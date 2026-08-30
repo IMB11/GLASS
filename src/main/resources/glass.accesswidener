@@ -1,9 +1,7 @@
 accessWidener	v2	named
-accessible	field	net/minecraft/client/renderer/GameRenderer	mainCamera	Lnet/minecraft/client/Camera;
-mutable	field	net/minecraft/client/renderer/GameRenderer	mainCamera	Lnet/minecraft/client/Camera;
-accessible	field	net/minecraft/client/renderer/GameRenderer	panoramicMode	Z
 accessible	method	net/minecraft/client/Camera	setPosition	(DDD)V
 accessible	method	net/minecraft/client/Camera	setRotation	(FF)V
+accessible	method	net/minecraft/client/Camera$NearPlane	<init>	(Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/world/phys/Vec3;)V
 accessible	field	net/minecraft/client/renderer/FogRenderer	fogRed	F
 accessible	field	net/minecraft/client/renderer/FogRenderer	fogGreen	F
 accessible	field	net/minecraft/client/renderer/FogRenderer	fogBlue	F

@@ -3,8 +3,10 @@ package dev.imb11.client.renderer.projection;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.world.entity.Entity;
 
 public final class ProjectionRenderContext {
+    private static final int MAX_FEED_RENDER_DISTANCE_CHUNKS = 6;
     private static final ThreadLocal<State> ACTIVE = new ThreadLocal<>();
 
     private ProjectionRenderContext() {
@@ -24,19 +26,27 @@ public final class ProjectionRenderContext {
         return state == null ? null : state.target;
     }
 
-    public static double cameraX(LevelRenderer renderer, double fallback) {
+    public static double cameraX(LevelRenderer renderer, Entity fallback) {
         State state = ACTIVE.get();
-        return state != null && state.renderer == renderer ? state.camera.getPosition().x : fallback;
+        return state != null && state.renderer == renderer ? state.camera.getPosition().x : fallback.getX();
     }
 
-    public static double cameraY(LevelRenderer renderer, double fallback) {
+    public static double cameraY(LevelRenderer renderer, Entity fallback) {
         State state = ACTIVE.get();
-        return state != null && state.renderer == renderer ? state.camera.getPosition().y : fallback;
+        return state != null && state.renderer == renderer ? state.camera.getPosition().y : fallback.getY();
     }
 
-    public static double cameraZ(LevelRenderer renderer, double fallback) {
+    public static double cameraZ(LevelRenderer renderer, Entity fallback) {
         State state = ACTIVE.get();
-        return state != null && state.renderer == renderer ? state.camera.getPosition().z : fallback;
+        return state != null && state.renderer == renderer ? state.camera.getPosition().z : fallback.getZ();
+    }
+
+    public static int feedRenderDistance(int configuredDistance) {
+        return Math.min(configuredDistance, MAX_FEED_RENDER_DISTANCE_CHUNKS);
+    }
+
+    public static int renderDistance(LevelRenderer renderer, int configuredDistance) {
+        return isActiveRenderer(renderer) ? feedRenderDistance(configuredDistance) : configuredDistance;
     }
 
     public static Scope enter(LevelRenderer renderer, Camera camera, RenderTarget target) {

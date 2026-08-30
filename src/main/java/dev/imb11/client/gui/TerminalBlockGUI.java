@@ -2,14 +2,12 @@ package dev.imb11.client.gui;
 
 import dev.imb11.Glass;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
-import dev.imb11.sync.Channel;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.packets.*;
 import io.github.cottonmc.cotton.gui.SyncedGuiDescription;
 import io.github.cottonmc.cotton.gui.widget.*;
 import io.github.cottonmc.cotton.gui.widget.data.Insets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -50,7 +48,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         CompoundTag nbt = context.channelManagerNbt();
 
-        ArrayList<Channel> channels = new ArrayList<>();
+        ArrayList<ChannelOption> channels = new ArrayList<>();
 
         assert nbt != null;
         ListTag _channels = nbt.getList("channels", Tag.TAG_COMPOUND);
@@ -58,27 +56,26 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         for (int i = 0; i < _channels.size(); i++) {
             CompoundTag channel = _channels.getCompound(i);
             @Nullable BlockPos bpos = (!channel.contains("linked_pos")) ? null : ChannelManagerPersistence.getFromIntArrayNBT("linked_pos", channel);
-            Channel channel1 = new Channel(channel.getString("name"), bpos);
+            ChannelOption channel1 = new ChannelOption(channel.getString("name"), bpos);
             channels.add(channel1);
         }
 
         if(channels.isEmpty()) {
-            ClientPlayNetworking.send(new C2SPopulateDefaultChannelPacket());
-            channels.add(new Channel("Default", null));
+            channels.add(new ChannelOption(ChannelManagerPersistence.DEFAULT_CHANNEL, null));
         }
 
         Glass.LOGGER.info("[GUI-CHANNELS] {} [WORLD] {}", channels, world);
 
         ArrayList<WButtonTooltip> channelButtons = new ArrayList<>();
 
-        WListPanel<Channel, WButtonTooltip> channelList = new WListPanel<>(channels, WButtonTooltip::new, (Channel channel, WButtonTooltip btn) -> {
+        WListPanel<ChannelOption, WButtonTooltip> channelList = new WListPanel<>(channels, WButtonTooltip::new, (ChannelOption channel, WButtonTooltip btn) -> {
 
             btn.setOnClick(() -> {
                 ClientPlayNetworking.send(new C2STerminalChannelChangedPacket(pos, btn.getLabel().getString()));
 
                 for (WButton channelButton : channelButtons) {
                     if(!channelButton.isEnabled()) {
-                        for (Channel channeles : channels) {
+                        for (ChannelOption channeles : channels) {
                             if(Objects.equals(channel.name(), channelButton.getLabel().getString())) {
                                 if (channeles.linkedBlock() == null) {
                                     channelButton.setEnabled(true);
@@ -121,7 +118,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
             for (WButton channelButton : channelButtons) {
                 if(!channelButton.isEnabled()) {
-                    for (Channel channel : channels) {
+                    for (ChannelOption channel : channels) {
                         if(Objects.equals(channel.name(), channelButton.getLabel().getString())) {
                             channelButton.setEnabled(channel.linkedBlock() == null);
                             break;
@@ -137,7 +134,7 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         unlinkChannelButton.setEnabled(false);
 
-        for (Channel channel : channels) {
+        for (ChannelOption channel : channels) {
             if(channel.linkedBlock() != null) {
                 if(channel.linkedBlock().asLong() == pos.asLong())
                 {
@@ -156,8 +153,8 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         WButton addChannel = new WButton();
         addChannel.setOnClick(() -> {
-            String val = channelNameBoxValue.get();
-            if(val.isBlank()) {
+            String val = ChannelManagerPersistence.canonicalChannelName(channelNameBoxValue.get());
+            if(val == null) {
                 addChannel.setLabel(Component.literal("Invalid Channel Name").withStyle(ChatFormatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
@@ -167,9 +164,9 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                 }, 1000);
             } else {
 
-                channels.add(new Channel(channelNameBoxValue.get(), null));
+                channels.add(new ChannelOption(val, null));
 
-                ClientPlayNetworking.send(new C2SCreateChannelPacket(channelNameBoxValue.get()));
+                ClientPlayNetworking.send(new C2SCreateChannelPacket(pos, val));
 
                 channelList.layout();
                 channelNameBoxValue.set("");
@@ -191,8 +188,8 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
 
         WButton removeChannel = new WButton();
         removeChannel.setOnClick(() -> {
-            String val = channelNameBoxValue.get();
-            if(val.isBlank()) {
+            String val = ChannelManagerPersistence.canonicalChannelName(channelNameBoxValue.get());
+            if(val == null) {
                 removeChannel.setLabel(Component.literal("Invalid Channel Name").withStyle(ChatFormatting.RED));
                 new Timer().schedule(new TimerTask() {
                     @Override
@@ -201,10 +198,10 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
                     }
                 }, 1000);
             } else {
-                for (Channel channel : channels) {
+                for (ChannelOption channel : channels) {
                     if(Objects.equals(channel.name(), val)) {
 
-                        ClientPlayNetworking.send(new C2SDeleteChannelPacket(channel.name()));
+                        ClientPlayNetworking.send(new C2SDeleteChannelPacket(pos, channel.name()));
                         channels.remove(channel);
                         channelList.layout();
                         removeChannel.setLabel(Component.literal("Removed!").withStyle(ChatFormatting.GREEN));
@@ -236,5 +233,12 @@ public class TerminalBlockGUI extends SyncedGuiDescription {
         root.add(previewLabel, (WIDTH/2), 110, (WIDTH/2) - 5, 5);
 
         root.validate(this);
+    }
+
+    public boolean isFor(BlockPos pos) {
+        return this.pos.equals(pos);
+    }
+
+    private record ChannelOption(String name, @Nullable BlockPos linkedBlock) {
     }
 }

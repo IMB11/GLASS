@@ -6,11 +6,15 @@
     "mixins": [
     ],
     "client": [
+        "BufferSourceAccessor",
         "GameRendererMixin",
         "LevelRendererBufferAccessor",
         "LevelRendererInvoker",
         "LevelRendererMixin",
-        "MinecraftMixin"
+        "MinecraftMixin",
+        "SectionRenderDispatcherRenderSectionMixin",
+        "VertexBufferMixin",
+        "ViewAreaInvoker"
     ],
     "injectors": {
         "defaultRequire": 1
