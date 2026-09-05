@@ -1,0 +1,18 @@
+{
+  "projection.panel_activate": {
+    "subtitle": "subtitles.glass.projection.panel_activate",
+    "sounds": [
+      "glass:projection/activate_1",
+      "glass:projection/activate_2",
+      "glass:projection/activate_3"
+    ]
+  },
+  "projection.panel_deactivate": {
+    "subtitle": "subtitles.glass.projection.panel_deactivate",
+    "sounds": [
+      "glass:projection/deactivate_1",
+      "glass:projection/deactivate_2",
+      "glass:projection/deactivate_3"
+    ]
+  }
+}

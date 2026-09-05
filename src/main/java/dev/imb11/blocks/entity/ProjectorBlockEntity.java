@@ -5,6 +5,7 @@ import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.projection.ProjectionSurface;
+import dev.imb11.sounds.GSounds;
 import dev.imb11.sync.ChannelManagerPersistence;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
@@ -20,6 +21,9 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -36,12 +40,17 @@ import java.util.Objects;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
     private static final Logger LOGGER = LogUtils.getLogger();
-    public static final int FADEOUT_TIME_MAX = 12;
+    public static final float BEACON_MAX_SPEED = 144.0F;
+    private static final float BEACON_RAMP_TICKS = 80.0F;
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
-    public int fadeoutTime = 12;
     public boolean active = false;
     private String channel = "";
-    public float rotationBeacon, rotationBeaconPrev;
+    private float rotationBeacon;
+    private float rotationBeaconPrev;
+    private float beaconSpinProgress;
+    private float beaconSpeed;
+    private float beaconSpeedPrev;
+    private boolean beaconAnimationInitialized;
 
     private ProjectionSurface projectionSurface;
     private long projectionSurfaceVersion;
@@ -55,31 +64,28 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     public static void tick(Level world, BlockPos pos, BlockState state, ProjectorBlockEntity be) {
-        be.tickFadeout();
         boolean wasActive = be.active;
-        be.active = world.hasNeighborSignal(pos);
+        be.active = world.isClientSide ? state.getValue(ProjectorBlock.POWERED) : world.hasNeighborSignal(pos);
+        if (!world.isClientSide && state.getValue(ProjectorBlock.POWERED) != be.active) {
+            world.setBlock(pos, state.setValue(ProjectorBlock.POWERED, be.active), Block.UPDATE_CLIENTS);
+        }
         if (wasActive != be.active) {
             be.logPowerChange(world, "neighbor-signal", wasActive);
+            be.setChanged();
         }
         if (!wasActive && be.active) {
             be.revealDistance = -1;
             be.clientRevealDistance = -1;
         }
-        float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
-        if (rotationFactor > 0) {
-            be.rotationBeacon += 20F * rotationFactor;
-        }
-        be.rotationBeaconPrev = be.rotationBeacon;
+        be.tickBeaconRotation();
         be.tickProjection(world);
     }
 
     @Override
     public void saveAdditional(CompoundTag tag, HolderLookup.Provider registryLookup) {
         tag.putFloat("rotationBeacon", rotationBeacon);
-        tag.putFloat("rotationBeaconPrev", rotationBeaconPrev);
         tag.putString("channel", channel);
         tag.putBoolean("active", active);
-        tag.putInt("fadeoutTime", fadeoutTime);
         tag.putInt("targetDistance", revealDistance);
         tag.putLong("projectionSurfaceVersion", projectionSurfaceVersion);
 
@@ -91,10 +97,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         boolean wasActive = active;
         String previousChannel = channel;
         channel = tag.getString("channel");
-        rotationBeacon = tag.getFloat("rotationBeacon");
-        rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
+        if (!beaconAnimationInitialized) {
+            rotationBeacon = Mth.positiveModulo(tag.getFloat("rotationBeacon"), 360.0F);
+            rotationBeaconPrev = rotationBeacon;
+        }
         active = tag.getBoolean("active");
-        fadeoutTime = tag.getInt("fadeoutTime");
         revealDistance = tag.contains("targetDistance") ? tag.getInt("targetDistance") : -1;
         projectionSurfaceVersion = Math.max(0L, tag.getLong("projectionSurfaceVersion"));
         if (!wasActive && active || !previousChannel.equals(channel)) {
@@ -171,16 +178,24 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         return new ScreenHandlerData(channel, worldPosition, channelManager.save(new CompoundTag(), null));
     }
 
-    private void tickFadeout() {
-        if (active) {
-            fadeoutTime = FADEOUT_TIME_MAX;
-        } else {
-            if (fadeoutTime > 0) {
-                fadeoutTime--;
-            } else {
-                fadeoutTime = 0;
-            }
-        }
+    private void tickBeaconRotation() {
+        beaconAnimationInitialized = true;
+        rotationBeaconPrev = Mth.positiveModulo(rotationBeacon, 360.0F);
+        beaconSpeedPrev = beaconSpeed;
+        beaconSpinProgress = Mth.clamp(beaconSpinProgress + (active ? 1.0F : -1.0F) / BEACON_RAMP_TICKS, 0.0F, 1.0F);
+        float easedProgress = beaconSpinProgress * beaconSpinProgress * (3.0F - 2.0F * beaconSpinProgress);
+        beaconSpeed = BEACON_MAX_SPEED * easedProgress;
+        rotationBeacon = rotationBeaconPrev + (beaconSpeedPrev + beaconSpeed) * 0.5F;
+    }
+
+    public float getBeaconRotation(float partialTick) {
+        float progress = Mth.clamp(partialTick, 0.0F, 1.0F);
+        return rotationBeaconPrev + beaconSpeedPrev * progress
+                + (beaconSpeed - beaconSpeedPrev) * progress * progress * 0.5F;
+    }
+
+    public float getBeaconSpeed(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), beaconSpeedPrev, beaconSpeed);
     }
 
     private void tickProjection(Level world) {
@@ -191,11 +206,13 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         ensureProjectionSurface(world, facing);
         if (world.isClientSide) {
             if (active) {
-                if (clientProjectionReady) {
-                    clientRevealDistance = Math.min(projectionSurface.completedRevealDistance(), clientRevealDistance + 1);
+                if (clientProjectionReady && clientRevealDistance < projectionSurface.completedRevealDistance()) {
+                    clientRevealDistance++;
+                    playPanelTransitionSounds(world, GSounds.PROJECTION_PANEL_ACTIVATE, clientRevealDistance);
                 }
-            } else {
-                clientRevealDistance = Math.max(-1, clientRevealDistance - 1);
+            } else if (clientRevealDistance >= 0) {
+                playPanelTransitionSounds(world, GSounds.PROJECTION_PANEL_DEACTIVATE, clientRevealDistance);
+                clientRevealDistance--;
             }
             return;
         }
@@ -207,6 +224,26 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
         if (revealDistance != oldRevealDistance) {
             setChanged();
+        }
+    }
+
+    private void playPanelTransitionSounds(Level world, SoundEvent sound, int distance) {
+        for (ProjectionSurface.Face face : projectionSurface.faces()) {
+            if (face.revealDistance() != distance) {
+                continue;
+            }
+            BlockPos position = face.position();
+            Direction normal = face.normal();
+            world.playLocalSound(
+                    position.getX() + 0.5D + normal.getStepX() * 0.5D,
+                    position.getY() + 0.5D + normal.getStepY() * 0.5D,
+                    position.getZ() + 0.5D + normal.getStepZ() * 0.5D,
+                    sound,
+                    SoundSource.BLOCKS,
+                    0.6F,
+                    0.8F + world.random.nextFloat() * 0.4F,
+                    false
+            );
         }
     }
 

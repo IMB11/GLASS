@@ -1,5 +1,6 @@
 package dev.imb11.mixins;
 
+import dev.imb11.client.compat.SodiumCompatibility;
 import dev.imb11.client.remote.ProjectionChunkStorage;
 import dev.imb11.client.remote.RemoteSceneClientManager;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -15,6 +16,7 @@ abstract class ClientLevelMixin {
     @Inject(method = "unload", at = @At("HEAD"), cancellable = true)
     private void glass$retainChunk(LevelChunk chunk, CallbackInfo ci) {
         if (ProjectionChunkStorage.of((ClientLevel) (Object) this).protectFromUnload(chunk)) {
+            SodiumCompatibility.onChunkUnloaded((ClientLevel) (Object) this, chunk.getPos());
             ci.cancel();
         }
     }

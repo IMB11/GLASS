@@ -2,7 +2,10 @@ package dev.imb11.client.renderer.block;
 
 import com.mojang.logging.LogUtils;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.client.ClientProjectionSourceRegistry;
@@ -16,15 +19,21 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.ModelBlockRenderer;
+import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -40,7 +49,28 @@ import java.util.Map;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final int BEACON_BLUR_SAMPLES = 10;
+    private static final float BEACON_BLUR_SHUTTER_TICKS = 0.5F;
+    private static final RenderType BEACON_BLUR_TYPE = RenderType.create(
+            "glass_projector_beacon_blur",
+            DefaultVertexFormat.NEW_ENTITY,
+            VertexFormat.Mode.QUADS,
+            1536,
+            false,
+            true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                    .setTextureState(new RenderStateShard.TextureStateShard(TextureAtlas.LOCATION_BLOCKS, false, true))
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setLightmapState(RenderStateShard.LIGHTMAP)
+                    .setOverlayState(RenderStateShard.OVERLAY)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .createCompositeState(false)
+    );
     private static final Map<ProjectorBlockEntity, ActivationDiagnostics> DIAGNOSTICS = new IdentityHashMap<>();
+    private static final Map<ProjectorBlockEntity, Long> LOADING_START_TIMES = new IdentityHashMap<>();
+    private static final long LOADING_FADE_NANOS = 500_000_000L;
+    private static final float LOADING_MAX_OPACITY = 0.35F;
     private static final int VIEW_DISTANCE = 64;
     private static final double VIEW_DISTANCE_SQUARED = VIEW_DISTANCE * VIEW_DISTANCE;
     private static final Map<ClientLevel, Map<BlockPos, Long>> RENDERED_FRAMES = new IdentityHashMap<>();
@@ -92,6 +122,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         ProjectorBlockEntity previous = projectors.put(entity.getBlockPos().immutable(), entity);
         if (previous != null && previous != entity) {
             DIAGNOSTICS.remove(previous);
+            LOADING_START_TIMES.remove(previous);
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == level) {
@@ -104,6 +135,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
     public static void unregisterLoaded(ClientLevel level, ProjectorBlockEntity entity) {
         DIAGNOSTICS.remove(entity);
+        LOADING_START_TIMES.remove(entity);
         Map<BlockPos, ProjectorBlockEntity> projectors = LOADED_PROJECTORS.get(level);
         if (projectors != null) {
             projectors.remove(entity.getBlockPos(), entity);
@@ -132,6 +164,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
     public static void clearLoaded() {
         LOADED_PROJECTORS.clear();
         DIAGNOSTICS.clear();
+        LOADING_START_TIMES.clear();
     }
 
     public static void prepareNearby(Minecraft minecraft) {
@@ -144,6 +177,9 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         List<ProjectorBlockEntity> nearby = new ArrayList<>();
         for (ProjectorBlockEntity projector : projectors.values()) {
             projector.setClientProjectionReady(false);
+            if (!projector.isActive() || projector.isRemoved()) {
+                LOADING_START_TIMES.remove(projector);
+            }
             if (projector.isRemoved()) {
                 continue;
             }
@@ -182,6 +218,30 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         for (int i = RemoteSceneServerManager.MAX_SUBSCRIPTIONS_PER_PLAYER; i < nearby.size(); i++) {
             reportActivation(nearby.get(i), "subscription-limit", null);
         }
+    }
+
+    public static void prepareSurfaceBlending(ClientLevel level) {
+        List<ProjectionSurfaceRenderer.Projection> projections = new ArrayList<>();
+        Map<BlockPos, ProjectorBlockEntity> projectors = LOADED_PROJECTORS.get(level);
+        if (projectors != null) {
+            for (ProjectorBlockEntity projector : projectors.values()) {
+                ProjectionSurface surface = projector.getProjectionSurface();
+                if (projector.isRemoved() || !projector.isProjectionVisible() || surface == null) {
+                    continue;
+                }
+                ProjectionRenderManager.ProjectionFeed feed = ProjectionRenderManager.preparedFeed(
+                        ClientProjectionSourceRegistry.resolve(projector.getChannel()),
+                        projector.getBlockPos(),
+                        surface
+                );
+                if (ProjectionRenderManager.isReady(feed)) {
+                    projections.add(new ProjectionSurfaceRenderer.Projection(
+                            projector.getBlockPos(), surface, feed, projector.getRevealDistance()
+                    ));
+                }
+            }
+        }
+        ProjectionSurfaceRenderer.prepare(level, projections);
     }
 
     private static void reportActivation(ProjectorBlockEntity projector, String stage, ProjectionRenderManager.ProjectionFeed feed) {
@@ -229,6 +289,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
     public static void releaseLevel(ClientLevel level) {
         DIAGNOSTICS.keySet().removeIf(projector -> projector.getLevel() == level);
+        LOADING_START_TIMES.keySet().removeIf(projector -> projector.getLevel() == level);
         RENDERED_FRAMES.remove(level);
         LOADED_PROJECTORS.remove(level);
         if (frustumLevel == level) {
@@ -238,24 +299,9 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
     public static void reset() {
         DIAGNOSTICS.clear();
+        LOADING_START_TIMES.clear();
         RENDERED_FRAMES.clear();
         clearFrustum();
-    }
-
-    private static float interpolateRotation(float prevRotation, float nextRotation, float partialTick) {
-        float f3;
-
-        f3 = nextRotation - prevRotation;
-        while (f3 < -180.0F) {
-            f3 += 360.0F;
-        }
-
-        while(f3 >= 180.0F)
-        {
-            f3 -= 360.0F;
-        }
-
-        return prevRotation + partialTick * f3;
     }
 
     @Override
@@ -278,8 +324,6 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
         matrices.translate(0.5D, 0.5D, 0.5D);
 
-        float scale = 0.5f;
-
         Direction direction = entity.getBlockState().getValue(ProjectorBlock.FACING);
         if (direction == Direction.DOWN) {
             matrices.mulPose(new Quaternionf().rotationXYZ((float) Math.toRadians(180.0f), 0.0f, 0.0f));
@@ -289,29 +333,37 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
             matrices.mulPose(new Quaternionf().rotationX((float) Math.toRadians(90f)));
         }
 
-        float rot = interpolateRotation(entity.rotationBeacon, entity.rotationBeaconPrev, tickDelta);
-        matrices.mulPose(new Quaternionf().rotationY((float) Math.toRadians(rot)));
-        matrices.translate(-0.25D, -0.25D, -0.25D);
-        matrices.scale(scale, scale, scale);
-
-        BlockRenderDispatcher blockRenderManager = Minecraft.getInstance().getBlockRenderer();
-        ModelBlockRenderer blockModelRenderer = blockRenderManager.getModelRenderer();
-
+        float rotation = entity.getBeaconRotation(tickDelta);
+        float speed = entity.getBeaconSpeed(tickDelta);
+        float blur = Mth.clamp((speed / ProjectorBlockEntity.BEACON_MAX_SPEED - 0.25F) / 0.75F, 0.0F, 1.0F);
+        blur = blur * blur * (3.0F - 2.0F * blur);
+        BlockState beaconState = Blocks.BEACON.defaultBlockState();
+        BakedModel beaconModel = Minecraft.getInstance().getBlockRenderer().getBlockModel(beaconState);
+        RandomSource random = RandomSource.create();
+        List<BakedQuad> quads = new ArrayList<>();
+        for (Direction face : Direction.values()) {
+            random.setSeed(42L);
+            quads.addAll(beaconModel.getQuads(beaconState, face, random));
+        }
+        random.setSeed(42L);
+        quads.addAll(beaconModel.getQuads(beaconState, null, random));
         int lightAbove = LevelRenderer.getLightColor(clientLevel, entity.getBlockPos().above());
-
-        blockModelRenderer.renderModel(matrices.last(),
-                vertexConsumers.getBuffer(ItemBlockRenderTypes.getChunkRenderType(Blocks.BEACON.defaultBlockState())),
-                Blocks.BEACON.defaultBlockState(),
-                blockRenderManager.getBlockModel(Blocks.BEACON.defaultBlockState()),
-                1f,
-                1f,
-                1f,
-                lightAbove,
-                OverlayTexture.NO_OVERLAY);
+        renderBeaconSample(matrices, vertexConsumers.getBuffer(ItemBlockRenderTypes.getChunkRenderType(beaconState)),
+                quads, rotation, 1.0F, lightAbove);
+        if (blur > 0.0F) {
+            VertexConsumer blurVertices = vertexConsumers.getBuffer(BEACON_BLUR_TYPE);
+            for (int sample = BEACON_BLUR_SAMPLES; sample > 0; sample--) {
+                float trail = (float) sample / BEACON_BLUR_SAMPLES;
+                float opacity = blur * Mth.lerp(trail, 0.14F, 0.035F);
+                renderBeaconSample(matrices, blurVertices, quads,
+                        rotation - speed * BEACON_BLUR_SHUTTER_TICKS * trail, opacity, lightAbove);
+            }
+        }
 
         matrices.popPose();
 
         if (!entity.isProjectionVisible() || surface == null) {
+            LOADING_START_TIMES.remove(entity);
             return;
         }
 
@@ -321,17 +373,39 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
                 entity.getBlockPos(),
                 surface
         );
-        if (feed == null || !feed.isReady()) {
-            return;
-        }
+        boolean loading = entity.isActive() && source != null && !ProjectionRenderManager.isReady(feed);
         ProjectionSurfaceRenderer.render(
                 clientLevel,
                 entity.getBlockPos(),
                 surface,
                 feed,
                 matrices,
-                entity.getRevealDistance()
+                loadingOpacity(entity, loading)
         );
+    }
+
+    private static void renderBeaconSample(PoseStack matrices, VertexConsumer vertices, List<BakedQuad> quads,
+                                           float rotation, float opacity, int light) {
+        matrices.pushPose();
+        matrices.mulPose(new Quaternionf().rotationY(rotation * Mth.DEG_TO_RAD));
+        matrices.scale(0.5F, 0.5F, 0.5F);
+        matrices.translate(-0.5D, -0.5D, -0.5D);
+        for (BakedQuad quad : quads) {
+            vertices.putBulkData(matrices.last(), quad, 1.0F, 1.0F, 1.0F, opacity, light, OverlayTexture.NO_OVERLAY);
+        }
+        matrices.popPose();
+    }
+
+    private static float loadingOpacity(ProjectorBlockEntity entity, boolean loading) {
+        if (!loading) {
+            LOADING_START_TIMES.remove(entity);
+            return -1.0F;
+        }
+        long now = System.nanoTime();
+        long start = LOADING_START_TIMES.computeIfAbsent(entity, ignored -> now);
+        long elapsed = (now - start) % (LOADING_FADE_NANOS * 2L);
+        double phase = (double) elapsed / LOADING_FADE_NANOS;
+        return LOADING_MAX_OPACITY * (float) (0.5D - 0.5D * Math.cos(Math.PI * phase));
     }
 
     private static AABB renderBounds(ProjectorBlockEntity entity, ProjectionSurface surface) {

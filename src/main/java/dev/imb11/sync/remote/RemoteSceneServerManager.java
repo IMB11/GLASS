@@ -1065,6 +1065,10 @@ public final class RemoteSceneServerManager {
     }
 
     private static void removePlayer(MinecraftServer server, ServerPlayer player, boolean notify) {
+        if (!server.isSameThread()) {
+            server.execute(() -> removePlayer(server, player, notify));
+            return;
+        }
         ServerState state = STATES.get(server);
         if (state == null) {
             return;

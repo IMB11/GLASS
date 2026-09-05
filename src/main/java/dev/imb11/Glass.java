@@ -3,6 +3,7 @@ package dev.imb11;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.items.GItems;
+import dev.imb11.sounds.GSounds;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GNetworking;
 import net.fabricmc.api.ModInitializer;
@@ -18,6 +19,7 @@ public class Glass implements ModInitializer {
     public void onInitialize() {
         GBlocks.init();
         GItems.init();
+        GSounds.init();
         GNetworking.initialize();
         ChannelManagerPersistence.init();
     }

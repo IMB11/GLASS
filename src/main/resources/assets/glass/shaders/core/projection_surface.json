@@ -2,11 +2,20 @@
     "vertex": "glass:projection_surface",
     "fragment": "glass:projection_surface",
     "samplers": [
-        { "name": "Sampler0" }
+        { "name": "Projection0" },
+        { "name": "Projection1" },
+        { "name": "Projection2" },
+        { "name": "Projection3" }
     ],
     "uniforms": [
         { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
         { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
-        { "name": "RevealProgress", "type": "float", "count": 1, "values": [ -1.0 ] }
+        { "name": "ProjectorPosition0", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "ProjectorPosition1", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "ProjectorPosition2", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "ProjectorPosition3", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "RevealProgress", "type": "float", "count": 4, "values": [ -1.0, -1.0, -1.0, -1.0 ] },
+        { "name": "CrossfadeWidth", "type": "float", "count": 1, "values": [ 4.0 ] },
+        { "name": "LoadingOpacity", "type": "float", "count": 1, "values": [ -1.0 ] }
     ]
 }

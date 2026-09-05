@@ -1,4 +1,6 @@
 {
   "block.glass.terminal": "G.L.A.S.S Terminal",
-  "block.glass.projector": "G.L.A.S.S Projector"
+  "block.glass.projector": "G.L.A.S.S Projector",
+  "subtitles.glass.projection.panel_activate": "Projection panel activates",
+  "subtitles.glass.projection.panel_deactivate": "Projection panel deactivates"
 }

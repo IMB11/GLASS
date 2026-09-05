@@ -93,6 +93,11 @@ public class GlassClient implements ClientModInitializer {
     }
 
     private static void clearConnection() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            minecraft.execute(GlassClient::clearConnection);
+            return;
+        }
         activeLevel = null;
         ClientProjectionSourceRegistry.clear();
         ProjectionRenderManager.reset();

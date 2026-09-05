@@ -2,6 +2,7 @@ package dev.imb11.mixins;
 
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ViewArea;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -26,6 +27,12 @@ public interface LevelRendererBufferAccessor {
 
     @Accessor("viewArea")
     ViewArea glass$getViewArea();
+
+    @Accessor("viewArea")
+    void glass$setViewArea(ViewArea viewArea);
+
+    @Accessor("level")
+    void glass$setLevel(ClientLevel level);
 
     @Accessor("visibleSections")
     ObjectArrayList<SectionRenderDispatcher.RenderSection> glass$getVisibleSections();

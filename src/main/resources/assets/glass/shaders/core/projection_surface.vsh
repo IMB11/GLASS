@@ -8,12 +8,15 @@ uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 
 noperspective out vec2 screenUv;
-flat out float revealDistance;
+out vec3 surfacePosition;
+flat out vec4 revealDistances;
+flat out vec4 projectionMask;
 
 void main() {
     vec4 clipPosition = ProjMat * ModelViewMat * vec4(Position, 1.0);
     gl_Position = clipPosition;
     screenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
-    vec3 encodedDistance = floor(Color.rgb * 255.0 + 0.5);
-    revealDistance = encodedDistance.r + encodedDistance.g * 256.0 + encodedDistance.b * 65536.0;
+    surfacePosition = Position;
+    revealDistances = vec4(mod(UV0.x, 4096.0), floor(UV0.x / 4096.0), mod(UV0.y, 4096.0), floor(UV0.y / 4096.0));
+    projectionMask = Color;
 }

@@ -1,5 +1,6 @@
 package dev.imb11.mixins;
 
+import dev.imb11.client.compat.SodiumCompatibility;
 import dev.imb11.client.renderer.projection.ProjectionRenderContext;
 import dev.imb11.client.remote.ProjectionChunkAccess;
 import dev.imb11.client.remote.ProjectionChunkStorage;
@@ -47,13 +48,17 @@ abstract class ClientChunkCacheMixin implements ProjectionChunkAccess {
                                          Consumer<ClientboundLevelChunkPacketData.BlockEntityTagOutput> blockEntities,
                                          CallbackInfoReturnable<LevelChunk> cir) {
         if (glass$chunks.contains(x, z)) {
-            cir.setReturnValue(glass$chunks.replace(level, x, z, data, heightmaps, blockEntities, true));
+            LevelChunk chunk = glass$chunks.replace(level, x, z, data, heightmaps, blockEntities, true);
+            SodiumCompatibility.onChunkLoaded(level, new ChunkPos(x, z));
+            cir.setReturnValue(chunk);
         }
     }
 
     @Inject(method = "drop", at = @At("HEAD"))
     private void glass$retainProjectionChunk(ChunkPos pos, CallbackInfo ci) {
-        glass$chunks.dropVanilla(level, pos);
+        if (glass$chunks.dropVanilla(level, pos)) {
+            SodiumCompatibility.onChunkUnloaded(level, pos);
+        }
     }
 
     @Inject(method = "replaceBiomes", at = @At("HEAD"), cancellable = true)

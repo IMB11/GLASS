@@ -15,7 +15,7 @@ import java.util.TreeSet;
 public final class ProjectionSurface {
     public static final int REVEAL_EDGE_WIDTH = 2;
     public static final int MAX_RADIUS = 64;
-    public static final int MAX_FACES = 4096;
+    public static final int MAX_FACES = 100;
 
     private static final long FNV_OFFSET_BASIS = 0xcbf29ce484222325L;
     private static final long FNV_PRIME = 0x100000001b3L;

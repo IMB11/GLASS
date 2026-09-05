@@ -1,7 +1,6 @@
 package dev.imb11.client.renderer.projection;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import dev.imb11.projection.ProjectionChunkRegion;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -9,7 +8,6 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LightLayer;
 
 import java.util.IdentityHashMap;
@@ -57,6 +55,11 @@ public final class ProjectionRenderContext {
         return state != null && state.renderer == renderer ? state.camera : fallback;
     }
 
+    public static Camera camera() {
+        State state = ACTIVE.get();
+        return state == null ? null : state.camera;
+    }
+
     public static LightTexture lightTexture() {
         State state = ACTIVE.get();
         return state == null ? null : state.lightTexture;
@@ -67,38 +70,12 @@ public final class ProjectionRenderContext {
         return state == null ? MAX_FEED_RENDER_DISTANCE_CHUNKS : state.grantedRenderDistanceChunks;
     }
 
-    public static double cameraX(LevelRenderer renderer, Entity fallback) {
-        State state = ACTIVE.get();
-        return state != null && state.renderer == renderer
-                ? (state.camera instanceof ProjectionCamera camera ? camera.gridCenter().getMiddleBlockX()
-                : ProjectionChunkRegion.gridAnchor(state.camera.getPosition().x)) : fallback.getX();
-    }
-
-    public static double cameraY(LevelRenderer renderer, Entity fallback) {
-        State state = ACTIVE.get();
-        return state != null && state.renderer == renderer ? state.camera.getPosition().y : fallback.getY();
-    }
-
-    public static double cameraZ(LevelRenderer renderer, Entity fallback) {
-        State state = ACTIVE.get();
-        return state != null && state.renderer == renderer
-                ? (state.camera instanceof ProjectionCamera camera ? camera.gridCenter().getMiddleBlockZ()
-                : ProjectionChunkRegion.gridAnchor(state.camera.getPosition().z)) : fallback.getZ();
-    }
-
     public static int feedRenderDistance(int configuredDistance) {
         return Math.min(configuredDistance, MAX_FEED_RENDER_DISTANCE_CHUNKS);
     }
 
     public static int feedRenderDistance(int configuredDistance, int grantedDistance) {
         return Math.min(configuredDistance, Math.min(MAX_FEED_RENDER_DISTANCE_CHUNKS, Math.max(1, grantedDistance)));
-    }
-
-    public static int renderDistance(LevelRenderer renderer, int configuredDistance) {
-        State state = ACTIVE.get();
-        return state != null && state.renderer == renderer
-                ? feedRenderDistance(configuredDistance, state.grantedRenderDistanceChunks)
-                : configuredDistance;
     }
 
     public static Scope enter(LevelRenderer renderer, Camera camera, RenderTarget target, BlockPos hiddenTerrainBlock) {

@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.13.6'
+    id 'net.fabricmc.fabric-loom-remap' version '1.16.1'
     id 'maven-publish'
 }
 
@@ -59,6 +59,11 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
+    modCompileOnly "maven.modrinth:sodium:${project.sodium_version}"
+    if (project.hasProperty('with_sodium')) {
+        modLocalRuntime "maven.modrinth:sodium:${project.sodium_version}"
+    }
+
     modImplementation include("io.github.cottonmc:LibGui:${project.libgui_version}")
 
 }
@@ -96,7 +101,7 @@ java {
 
 jar {
     from("LICENSE") {
-        rename { "${it}_${project.archivesBaseName}" }
+        rename { "${it}_${base.archivesName.get()}" }
     }
 }
 

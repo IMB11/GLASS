@@ -4,8 +4,6 @@ import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -52,13 +50,11 @@ public class ProjectorBlock extends BaseEntityBlock {
 
     @Override
     public void neighborChanged(BlockState state, Level world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
-        if (world.hasNeighborSignal(pos)) {
-            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
-            registerDefaultState(state.setValue(POWERED, true));
-        } else {
-
-            world.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 1.5f, 0.2f, true);
-            registerDefaultState(state.setValue(POWERED, false));
+        if (!world.isClientSide) {
+            boolean powered = world.hasNeighborSignal(pos);
+            if (state.getValue(POWERED) != powered) {
+                world.setBlock(pos, state.setValue(POWERED, powered), Block.UPDATE_CLIENTS);
+            }
         }
 
         super.neighborChanged(state, world, pos, sourceBlock, sourcePos, notify);
@@ -86,7 +82,9 @@ public class ProjectorBlock extends BaseEntityBlock {
     @Nullable
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
-        return this.defaultBlockState().setValue(FACING, ctx.getNearestLookingDirection().getOpposite());
+        return this.defaultBlockState()
+                .setValue(FACING, ctx.getNearestLookingDirection().getOpposite())
+                .setValue(POWERED, ctx.getLevel().hasNeighborSignal(ctx.getClickedPos()));
     }
 
     @Override

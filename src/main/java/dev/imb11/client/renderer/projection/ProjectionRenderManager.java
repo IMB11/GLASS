@@ -209,6 +209,15 @@ public final class ProjectionRenderManager {
 
     @Nullable
     public static ProjectionFeed visibleFeed(@Nullable ProjectionSource source, BlockPos projectorPos, ProjectionSurface surface) {
+        ProjectionFeed feed = preparedFeed(source, projectorPos, surface);
+        if (feed != null) {
+            markVisible(feed);
+        }
+        return feed;
+    }
+
+    @Nullable
+    public static ProjectionFeed preparedFeed(@Nullable ProjectionSource source, BlockPos projectorPos, ProjectionSurface surface) {
         if (source == null || activeLevel == null) {
             return null;
         }
@@ -218,12 +227,24 @@ public final class ProjectionRenderManager {
                 || !feed.view.equals(ProjectionView.create(activeLevel.dimension(), projectorPos, surface))) {
             return null;
         }
-        feed.lastVisibleFrame = frameSequence;
         return feed;
+    }
+
+    static void markVisible(ProjectionFeed feed) {
+        feed.lastVisibleFrame = frameSequence;
     }
 
     public static long currentFrameSequence() {
         return frameSequence;
+    }
+
+    public static boolean hasVisibleProjection() {
+        for (ProjectionFeed feed : FEEDS.values()) {
+            if (feed.ready && frameSequence - feed.lastRequestFrame <= REQUEST_RENDER_GRACE_FRAMES) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void trackViewer(
@@ -475,6 +496,7 @@ public final class ProjectionRenderManager {
         }
         drainRetiredBufferPools();
         restoreMainRenderState(mainTarget, gameRenderer, mainProjection, mainModelView);
+        ProjectorBlockEntityRenderer.prepareSurfaceBlending(currentLevel);
     }
 
     public static void reset() {
@@ -742,12 +764,11 @@ public final class ProjectionRenderManager {
         feed.lightTexture = lightTexture;
         feed.rendererRadius = grantedRadius;
         if (created) {
-            terrain.buffers = new RenderBuffers(FEED_BUILD_BUFFERS);
+            terrain.buffers = new ProjectionRenderBuffers(FEED_BUILD_BUFFERS);
             terrain.bufferCount = terrain.buffers.sectionBufferPool().getFreeBufferCount();
             feed.renderBuffers = terrain.buffers;
             feed.compileBufferCount = terrain.bufferCount;
-            feed.renderer = terrain.renderer = new LevelRenderer(minecraft, minecraft.getEntityRenderDispatcher(),
-                    minecraft.getBlockEntityRenderDispatcher(), terrain.buffers);
+            feed.renderer = terrain.renderer = new ProjectionLevelRenderer(minecraft, terrain.buffers, grantedRadius);
             try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(
                     feed.renderer, feed.camera, feed.target, feed.source.pos(), level, lightTexture, grantedRadius
             )) {
@@ -782,8 +803,7 @@ public final class ProjectionRenderManager {
         try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(
                 feed.renderer, feed.camera, feed.target, feed.source.pos(), feed.level, feed.lightTexture, feed.rendererRadius
         )) {
-            LevelRendererInvoker invoker = (LevelRendererInvoker) feed.renderer;
-            invoker.glass$setupRender(feed.camera, frustum, true, true);
+            feed.renderer.prepareCamera(feed.camera);
             LevelRendererBufferAccessor accessor = (LevelRendererBufferAccessor) feed.renderer;
             SectionRenderDispatcher dispatcher = feed.renderer.getSectionRenderDispatcher();
             uploadTerrain(dispatcher);
@@ -937,7 +957,6 @@ public final class ProjectionRenderManager {
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
 
-        LevelRendererInvoker invoker = (LevelRendererInvoker) renderer;
         try (ProjectionRenderContext.Scope ignored = ProjectionRenderContext.enter(
                 renderer,
                 feed.camera,
@@ -980,7 +999,7 @@ public final class ProjectionRenderManager {
                         sortSharedTransparency(feed);
                     }
                 }
-                renderLayer(invoker, layer, cameraPosition, modelView, projection, target);
+                renderLayer(feed.renderer, layer, cameraPosition, modelView, projection, target);
             }
 
             if (minecraft.options.getCloudsType() != CloudStatus.OFF) {
@@ -1429,7 +1448,7 @@ public final class ProjectionRenderManager {
     }
 
     private static void renderLayer(
-            LevelRendererInvoker invoker,
+            ProjectionLevelRenderer renderer,
             RenderType layer,
             Vec3 cameraPosition,
             Matrix4f modelView,
@@ -1438,14 +1457,7 @@ public final class ProjectionRenderManager {
     ) {
         boolean completed = false;
         try {
-            invoker.glass$renderSectionLayer(
-                    layer,
-                    cameraPosition.x,
-                    cameraPosition.y,
-                    cameraPosition.z,
-                    modelView,
-                    projection
-            );
+            renderer.renderTerrainLayer(layer, cameraPosition, modelView, projection);
             completed = true;
         } finally {
             if (!completed) {
@@ -1681,7 +1693,7 @@ public final class ProjectionRenderManager {
 
     private static final class TerrainResources {
         private TerrainKey key;
-        private LevelRenderer renderer;
+        private ProjectionLevelRenderer renderer;
         private RenderBuffers buffers;
         private ByteBufferBuilder sortBuffer;
         private int bufferCount;
@@ -1813,7 +1825,7 @@ public final class ProjectionRenderManager {
         private RenderBuffers renderBuffers;
         private TerrainResources terrain;
         private int compileBufferCount;
-        private LevelRenderer renderer;
+        private ProjectionLevelRenderer renderer;
         private TextureTarget target;
         private TextureManager textureManager;
         private ProjectionTargetTexture textureProxy;
