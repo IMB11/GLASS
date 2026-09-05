@@ -9,6 +9,7 @@ import dev.imb11.client.gui.TerminalBlockScreen;
 import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
+import dev.imb11.client.remote.RemoteSceneClientManager;
 import dev.imb11.sync.packets.S2CChannelSnapshotPacket;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
@@ -37,19 +38,21 @@ public class GlassClient implements ClientModInitializer {
                 S2CChannelSnapshotPacket.PACKET_ID,
                 (packet, context) -> ClientProjectionSourceRegistry.applySnapshot(packet)
         );
+        RemoteSceneClientManager.registerReceivers();
         ClientPlayConnectionEvents.INIT.register((handler, client) -> clearConnection());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearConnection());
         ClientTickEvents.START_CLIENT_TICK.register(GlassClient::trackLevel);
+        ClientTickEvents.START_CLIENT_TICK.register(RemoteSceneClientManager::tick);
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) ->
                 ProjectionRenderManager.onClientChunkUnloaded(level, chunk.getPos())
         );
         ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, level) -> {
-            if (blockEntity instanceof ProjectorBlockEntity projector) {
+            if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
                 ProjectorBlockEntityRenderer.registerLoaded(level, projector);
             }
         });
         ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((blockEntity, level) -> {
-            if (blockEntity instanceof ProjectorBlockEntity projector) {
+            if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
                 ProjectorBlockEntityRenderer.unregisterLoaded(level, projector);
                 ProjectionSurfaceRenderer.release(level, projector.getBlockPos());
                 ProjectorBlockEntityRenderer.release(level, projector.getBlockPos());
@@ -63,6 +66,7 @@ public class GlassClient implements ClientModInitializer {
 
     private static void registerProjectionShader(CoreShaderRegistrationCallback.RegistrationContext context) throws IOException {
         ProjectionRenderManager.reset();
+        RemoteSceneClientManager.onResourceReload();
         ProjectorBlockEntityRenderer.reset();
         ProjectionSurfaceRenderer.registerShader(context);
     }
@@ -85,12 +89,14 @@ public class GlassClient implements ClientModInitializer {
             ProjectorBlockEntityRenderer.onMainRendererRebuilt(minecraft.levelRenderer);
             ProjectionRenderManager.onClientLevelChanged(currentLevel);
         }
+        RemoteSceneClientManager.onMainLevelChanged(currentLevel);
     }
 
     private static void clearConnection() {
         activeLevel = null;
         ClientProjectionSourceRegistry.clear();
         ProjectionRenderManager.reset();
+        RemoteSceneClientManager.clearConnection();
         ProjectionSurfaceRenderer.reset();
         ProjectorBlockEntityRenderer.reset();
         ProjectorBlockEntityRenderer.clearLoaded();

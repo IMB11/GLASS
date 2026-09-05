@@ -4,10 +4,21 @@
     "package": "dev.imb11.mixins",
     "compatibilityLevel": "JAVA_21",
     "mixins": [
+        "ChunkMapAccessor",
+        "ChunkMapMixin",
+        "TrackedEntityAccessor",
+        "TrackedEntityMixin",
+        "ServerChunkCacheMixin"
     ],
     "client": [
         "BufferSourceAccessor",
+        "ClientChunkCacheMixin",
+        "ClientLevelMixin",
+        "ClientPacketListenerMixin",
+        "CompiledSectionAccessor",
         "GameRendererMixin",
+        "LightTextureAccessor",
+        "LightTextureMixin",
         "LevelRendererBufferAccessor",
         "LevelRendererInvoker",
         "LevelRendererMixin",
@@ -15,6 +26,7 @@
         "RenderChunkRegionMixin",
         "RenderRegionCacheMixin",
         "SectionRenderDispatcherRenderSectionMixin",
+        "SectionRenderDispatcherAccessor",
         "VertexBufferMixin",
         "ViewAreaInvoker"
     ],

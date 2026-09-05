@@ -1,5 +1,6 @@
 package dev.imb11.client.renderer.block;
 
+import com.mojang.logging.LogUtils;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.imb11.blocks.ProjectorBlock;
@@ -9,6 +10,7 @@ import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import dev.imb11.projection.ProjectionSurface;
 import dev.imb11.sync.ProjectionSource;
+import dev.imb11.sync.remote.RemoteSceneServerManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
@@ -27,13 +29,18 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<ProjectorBlockEntity> {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Map<ProjectorBlockEntity, ActivationDiagnostics> DIAGNOSTICS = new IdentityHashMap<>();
     private static final int VIEW_DISTANCE = 64;
     private static final double VIEW_DISTANCE_SQUARED = VIEW_DISTANCE * VIEW_DISTANCE;
     private static final Map<ClientLevel, Map<BlockPos, Long>> RENDERED_FRAMES = new IdentityHashMap<>();
@@ -83,6 +90,9 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
                 ignored -> new HashMap<>()
         );
         ProjectorBlockEntity previous = projectors.put(entity.getBlockPos().immutable(), entity);
+        if (previous != null && previous != entity) {
+            DIAGNOSTICS.remove(previous);
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == level) {
             minecraft.levelRenderer.updateGlobalBlockEntities(
@@ -93,6 +103,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
     }
 
     public static void unregisterLoaded(ClientLevel level, ProjectorBlockEntity entity) {
+        DIAGNOSTICS.remove(entity);
         Map<BlockPos, ProjectorBlockEntity> projectors = LOADED_PROJECTORS.get(level);
         if (projectors != null) {
             projectors.remove(entity.getBlockPos(), entity);
@@ -120,9 +131,104 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
 
     public static void clearLoaded() {
         LOADED_PROJECTORS.clear();
+        DIAGNOSTICS.clear();
+    }
+
+    public static void prepareNearby(Minecraft minecraft) {
+        ClientLevel level = minecraft.level;
+        Map<BlockPos, ProjectorBlockEntity> projectors = LOADED_PROJECTORS.get(level);
+        if (projectors == null || minecraft.player == null) {
+            return;
+        }
+        Vec3 viewer = minecraft.gameRenderer.getMainCamera().getPosition();
+        List<ProjectorBlockEntity> nearby = new ArrayList<>();
+        for (ProjectorBlockEntity projector : projectors.values()) {
+            projector.setClientProjectionReady(false);
+            if (projector.isRemoved()) {
+                continue;
+            }
+            if (ClientProjectionSourceRegistry.resolve(projector.getChannel()) == null) {
+                reportActivation(projector, "missing-channel-source", null);
+                continue;
+            }
+            if (distanceToSqr(new AABB(projector.getBlockPos()).inflate(ProjectionSurface.MAX_RADIUS), viewer)
+                    > VIEW_DISTANCE_SQUARED) {
+                reportActivation(projector, "outside-preload-range", null);
+                continue;
+            }
+            projector.prepareProjectionSurface();
+            ProjectionSurface surface = projector.getProjectionSurface();
+            if (surface != null && distanceToSqr(surface.renderBounds(), viewer) <= VIEW_DISTANCE_SQUARED) {
+                nearby.add(projector);
+            } else {
+                reportActivation(projector, surface == null ? "missing-surface" : "outside-surface-range", null);
+            }
+        }
+        nearby.sort(Comparator.comparing((ProjectorBlockEntity projector) -> !projector.isProjectionVisible())
+                .thenComparingDouble(projector -> distanceToSqr(projector.getProjectionSurface().renderBounds(), viewer))
+                .thenComparingLong(projector -> projector.getBlockPos().asLong()));
+        int selectedCount = Math.min(nearby.size(), RemoteSceneServerManager.MAX_SUBSCRIPTIONS_PER_PLAYER);
+        ProjectionRenderManager.prepareRequests(nearby.subList(0, selectedCount));
+        for (int i = 0; i < selectedCount; i++) {
+            ProjectorBlockEntity projector = nearby.get(i);
+            ProjectionRenderManager.ProjectionFeed feed = ProjectionRenderManager.requestFeed(
+                    ClientProjectionSourceRegistry.resolve(projector.getChannel()),
+                    projector.getBlockPos(),
+                    projector.getProjectionSurface()
+            );
+            projector.setClientProjectionReady(ProjectionRenderManager.isReady(feed));
+            reportActivation(projector, feed == null ? "feed-request-rejected" : feed.diagnosticStage(), feed);
+        }
+        for (int i = RemoteSceneServerManager.MAX_SUBSCRIPTIONS_PER_PLAYER; i < nearby.size(); i++) {
+            reportActivation(nearby.get(i), "subscription-limit", null);
+        }
+    }
+
+    private static void reportActivation(ProjectorBlockEntity projector, String stage, ProjectionRenderManager.ProjectionFeed feed) {
+        ActivationDiagnostics diagnostic = DIAGNOSTICS.computeIfAbsent(projector, ignored -> new ActivationDiagnostics());
+        long now = System.nanoTime();
+        boolean powered = projector.isActive();
+        boolean powerChanged = diagnostic.powered != powered;
+        if (powerChanged) {
+            diagnostic.powered = powered;
+            diagnostic.poweredSince = now;
+        }
+        boolean ready = ProjectionRenderManager.isReady(feed);
+        long sinceLog = now - diagnostic.lastLog;
+        boolean stalled = powered && !ready && now - diagnostic.poweredSince >= 5_000_000_000L;
+        boolean changed = !stage.equals(diagnostic.stage) || ready != diagnostic.ready;
+        if (diagnostic.stage != null && !powerChanged && !(changed && sinceLog >= 1_000_000_000L)
+                && !(stalled && sinceLog >= 5_000_000_000L)) {
+            return;
+        }
+        diagnostic.stage = stage;
+        diagnostic.ready = ready;
+        diagnostic.lastLog = now;
+        ProjectionSurface surface = projector.getProjectionSurface();
+        String message = "[GLASS projector] activation dimension={} pos={} channel={} powered={} poweredMs={} stage={} ready={} reveal={} surfaceVersion={} bounds={} {}";
+        Object[] details = {
+                projector.getLevel().dimension().location(), projector.getBlockPos().toShortString(), projector.getChannel(),
+                powered, powered ? (now - diagnostic.poweredSince) / 1_000_000L : 0L, stage, ready, projector.getRevealDistance(),
+                surface == null ? -1L : surface.version(), surface == null ? "none" : surface.renderBounds(),
+                feed == null ? "feed=none" : feed.diagnostics()
+        };
+        if (stalled) {
+            LOGGER.warn(message, details);
+        } else {
+            LOGGER.info(message, details);
+        }
+    }
+
+    private static final class ActivationDiagnostics {
+        private String stage;
+        private boolean powered;
+        private boolean ready;
+        private long poweredSince;
+        private long lastLog;
     }
 
     public static void releaseLevel(ClientLevel level) {
+        DIAGNOSTICS.keySet().removeIf(projector -> projector.getLevel() == level);
         RENDERED_FRAMES.remove(level);
         LOADED_PROJECTORS.remove(level);
         if (frustumLevel == level) {
@@ -131,6 +237,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
     }
 
     public static void reset() {
+        DIAGNOSTICS.clear();
         RENDERED_FRAMES.clear();
         clearFrustum();
     }
@@ -209,7 +316,7 @@ public class ProjectorBlockEntityRenderer implements BlockEntityRenderer<Project
         }
 
         ProjectionSource source = ClientProjectionSourceRegistry.resolve(entity.getChannel());
-        ProjectionRenderManager.ProjectionFeed feed = ProjectionRenderManager.requestFeed(
+        ProjectionRenderManager.ProjectionFeed feed = ProjectionRenderManager.visibleFeed(
                 source,
                 entity.getBlockPos(),
                 surface

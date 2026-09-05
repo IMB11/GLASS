@@ -1,5 +1,6 @@
 package dev.imb11.blocks.entity;
 
+import com.mojang.logging.LogUtils;
 import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.ProjectorBlock;
 import dev.imb11.client.gui.ProjectorBlockGUI;
@@ -29,10 +30,12 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.Objects;
 
 public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
+    private static final Logger LOGGER = LogUtils.getLogger();
     public static final int FADEOUT_TIME_MAX = 12;
     public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
     public int fadeoutTime = 12;
@@ -43,6 +46,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     private ProjectionSurface projectionSurface;
     private long projectionSurfaceVersion;
     private int revealDistance = -1;
+    private int clientRevealDistance = -1;
+    private boolean clientProjectionReady;
+    private long lastPreparationTick = Long.MIN_VALUE;
 
     public ProjectorBlockEntity(BlockPos pos, BlockState state) {
         super(BLOCK_ENTITY_TYPE, pos, state);
@@ -52,8 +58,12 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         be.tickFadeout();
         boolean wasActive = be.active;
         be.active = world.hasNeighborSignal(pos);
+        if (wasActive != be.active) {
+            be.logPowerChange(world, "neighbor-signal", wasActive);
+        }
         if (!wasActive && be.active) {
             be.revealDistance = -1;
+            be.clientRevealDistance = -1;
         }
         float rotationFactor = be.active ? ((float) be.fadeoutTime / FADEOUT_TIME_MAX) : (1.0F - ((float) be.fadeoutTime / FADEOUT_TIME_MAX));
         if (rotationFactor > 0) {
@@ -78,6 +88,8 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
 
     @Override
     public void loadAdditional(CompoundTag tag, HolderLookup.Provider registryLookup) {
+        boolean wasActive = active;
+        String previousChannel = channel;
         channel = tag.getString("channel");
         rotationBeacon = tag.getFloat("rotationBeacon");
         rotationBeaconPrev = tag.getFloat("rotationBeaconPrev");
@@ -85,12 +97,25 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         fadeoutTime = tag.getInt("fadeoutTime");
         revealDistance = tag.contains("targetDistance") ? tag.getInt("targetDistance") : -1;
         projectionSurfaceVersion = Math.max(0L, tag.getLong("projectionSurfaceVersion"));
+        if (!wasActive && active || !previousChannel.equals(channel)) {
+            clientRevealDistance = -1;
+            clientProjectionReady = false;
+        }
+        if (level != null && wasActive != active) {
+            logPowerChange(level, "block-entity-sync", wasActive);
+        }
 
         super.loadAdditional(tag, registryLookup);
     }
 
     public String getChannel() {
         return channel;
+    }
+
+    private void logPowerChange(Level world, String cause, boolean wasActive) {
+        LOGGER.info("[GLASS projector] power side={} dimension={} pos={} channel={} cause={} active={}->{} reveal={} clientReady={} surfaceVersion={} tick={}",
+                world.isClientSide ? "client" : "server", world.dimension().location(), worldPosition.toShortString(),
+                channel, cause, wasActive, active, getRevealDistance(), clientProjectionReady, projectionSurfaceVersion, world.getGameTime());
     }
 
     public void setChannelFromServer(String channel) {
@@ -159,11 +184,21 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
     }
 
     private void tickProjection(Level world) {
-        if (!active && revealDistance < 0) {
+        if (!active && getRevealDistance() < 0) {
             return;
         }
         Direction facing = getBlockState().getValue(ProjectorBlock.FACING);
         ensureProjectionSurface(world, facing);
+        if (world.isClientSide) {
+            if (active) {
+                if (clientProjectionReady) {
+                    clientRevealDistance = Math.min(projectionSurface.completedRevealDistance(), clientRevealDistance + 1);
+                }
+            } else {
+                clientRevealDistance = Math.max(-1, clientRevealDistance - 1);
+            }
+            return;
+        }
         int oldRevealDistance = revealDistance;
         if (active) {
             revealDistance = Math.min(projectionSurface.completedRevealDistance(), revealDistance + 1);
@@ -198,8 +233,10 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         projectionSurfaceVersion = nextVersion;
         if (facingChanged) {
             revealDistance = -1;
+            clientRevealDistance = -1;
         } else {
             revealDistance = Math.min(revealDistance, rebuilt.completedRevealDistance());
+            clientRevealDistance = Math.min(clientRevealDistance, rebuilt.completedRevealDistance());
         }
         setChanged();
     }
@@ -220,12 +257,28 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         return projectionSurface;
     }
 
+    public void prepareProjectionSurface() {
+        if (level != null) {
+            long tick = level.getGameTime();
+            if (projectionSurface != null && projectionSurface.facing() == getBlockState().getValue(ProjectorBlock.FACING)
+                    && lastPreparationTick != Long.MIN_VALUE && tick - lastPreparationTick < 10L) {
+                return;
+            }
+            lastPreparationTick = tick;
+            ensureProjectionSurface(level, getBlockState().getValue(ProjectorBlock.FACING));
+        }
+    }
+
+    public void setClientProjectionReady(boolean ready) {
+        clientProjectionReady = ready;
+    }
+
     public int getRevealDistance() {
-        return revealDistance;
+        return level != null && level.isClientSide ? clientRevealDistance : revealDistance;
     }
 
     public boolean isProjectionVisible() {
-        return projectionSurface != null && (active || revealDistance >= 0);
+        return projectionSurface != null && (active || getRevealDistance() >= 0);
     }
 
     public boolean isActive() {
