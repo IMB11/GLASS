@@ -4,8 +4,7 @@ import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.TerminalBlock;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.packets.S2CChannelSnapshotPacket;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -26,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -48,6 +48,7 @@ public final class ChannelManagerPersistence extends SavedData {
     private Set<ResourceKey<Level>> importedLegacyDimensions = Set.of();
     private long registryRevision;
     private transient MinecraftServer server;
+    private final Map<String, ProjectionActivity> projectionActivity = new HashMap<>();
 
     public static ChannelManagerPersistence get(Level level) {
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -63,21 +64,23 @@ public final class ChannelManagerPersistence extends SavedData {
         return persistence;
     }
 
-    public static void init() {
-        ServerWorldEvents.LOAD.register((server, world) -> defer(server, () -> {
+    public static void onLevelLoad(ServerLevel world) {
+        MinecraftServer server = world.getServer();
+        defer(server, () -> {
             if (server.overworld() != null) {
                 get(server).importLegacy(world);
             }
-        }));
-        ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, world) -> {
-            if (blockEntity instanceof TerminalBlockEntity terminal) {
-                defer(world.getServer(), () -> {
-                    if (world.hasChunkAt(terminal.getBlockPos()) && world.getBlockEntity(terminal.getBlockPos()) == terminal) {
-                        get(world).reconcileTerminal(terminal);
-                    }
-                });
-            }
         });
+    }
+
+    public static void onBlockEntityLoad(BlockEntity blockEntity, ServerLevel world) {
+        if (blockEntity instanceof TerminalBlockEntity terminal) {
+            defer(world.getServer(), () -> {
+                if (world.hasChunkAt(terminal.getBlockPos()) && world.getBlockEntity(terminal.getBlockPos()) == terminal) {
+                    get(world).reconcileTerminal(terminal);
+                }
+            });
+        }
     }
 
     public long registryRevision() {
@@ -99,6 +102,23 @@ public final class ChannelManagerPersistence extends SavedData {
 
     public Optional<ProjectionSource> resolve(String name) {
         return channel(name).map(Channel::source);
+    }
+
+    public void recordProjection(String name) {
+        if (server != null) {
+            resolve(name).ifPresent(source -> projectionActivity.put(source.channel(),
+                    new ProjectionActivity(source, server.getTickCount())));
+        }
+    }
+
+    public boolean isProjecting(ServerLevel level, BlockPos pos, String name) {
+        ProjectionActivity activity = projectionActivity.get(name);
+        if (server == null || activity == null
+                || !sameLocation(activity.source().dimension(), activity.source().pos(), level.dimension(), pos)) {
+            return false;
+        }
+        int age = server.getTickCount() - activity.tick();
+        return age >= 0 && age <= 2;
     }
 
     public boolean containsName(String name) {
@@ -409,6 +429,10 @@ public final class ChannelManagerPersistence extends SavedData {
 
     private void commit(Map<String, Channel> nextChannels, Map<String, PendingLink> nextPending, long revision) {
         channels = immutableMap(nextChannels);
+        projectionActivity.entrySet().removeIf(entry -> {
+            Channel channel = channels.get(entry.getKey());
+            return channel == null || !entry.getValue().source().equals(channel.source());
+        });
         pendingLinks = immutableMap(nextPending);
         registryRevision = revision;
         setDirty();
@@ -510,6 +534,9 @@ public final class ChannelManagerPersistence extends SavedData {
         private PendingLink {
             pos = pos.immutable();
         }
+    }
+
+    private record ProjectionActivity(ProjectionSource source, int tick) {
     }
 
     private record LegacyEntry(String name, @Nullable BlockPos pos) {

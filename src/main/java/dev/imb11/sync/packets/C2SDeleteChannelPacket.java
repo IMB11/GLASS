@@ -2,7 +2,7 @@ package dev.imb11.sync.packets;
 
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GNetworking;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,9 +21,9 @@ public record C2SDeleteChannelPacket(BlockPos pos, String channel) implements Cu
         return PACKET_ID;
     }
 
-    public static void receive(C2SDeleteChannelPacket payload, ServerPlayNetworking.Context context) {
-        if (GNetworking.canUseTerminal(context.player(), payload.pos())) {
-            ChannelManagerPersistence.get(context.player().serverLevel()).deleteChannel(payload.channel());
+    public static void receive(C2SDeleteChannelPacket payload, ServerPlayer player) {
+        if (GNetworking.canUseTerminal(player, payload.pos())) {
+            ChannelManagerPersistence.get(player.serverLevel()).deleteChannel(payload.channel());
         }
     }
 }

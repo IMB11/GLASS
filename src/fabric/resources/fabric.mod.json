@@ -12,10 +12,10 @@
     "environment": "*",
     "entrypoints": {
         "client": [
-            "dev.imb11.client.GlassClient"
+            "dev.imb11.fabric.GlassFabricClient"
         ],
         "main": [
-            "dev.imb11.Glass"
+            "dev.imb11.fabric.GlassFabric"
         ],
         "fabric-datagen": [
             "dev.imb11.datagen.GlassDataGenerator"

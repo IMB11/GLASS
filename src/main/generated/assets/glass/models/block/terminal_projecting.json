@@ -1,0 +1,6 @@
+{
+  "parent": "glass:block/terminal",
+  "textures": {
+    "front": "glass:block/terminal_sensor_recording"
+  }
+}

@@ -4,7 +4,7 @@ import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkStatus;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension;
-import net.fabricmc.loader.api.FabricLoader;
+import dev.imb11.platform.Platform;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.world.level.ChunkPos;
@@ -12,7 +12,7 @@ import net.minecraft.world.level.ChunkPos;
 import java.util.List;
 
 public final class SodiumCompatibility {
-    private static final boolean LOADED = FabricLoader.getInstance().isModLoaded("sodium");
+    private static final boolean LOADED = Platform.isModLoaded("sodium");
 
     private SodiumCompatibility() {
     }

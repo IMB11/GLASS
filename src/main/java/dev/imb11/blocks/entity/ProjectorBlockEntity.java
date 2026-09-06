@@ -7,8 +7,8 @@ import dev.imb11.client.gui.ProjectorBlockGUI;
 import dev.imb11.projection.ProjectionSurface;
 import dev.imb11.sounds.GSounds;
 import dev.imb11.sync.ChannelManagerPersistence;
-import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
+import dev.imb11.platform.PlatformBlockEntity;
+import dev.imb11.platform.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -37,11 +37,11 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 
-public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
+public class ProjectorBlockEntity extends PlatformBlockEntity implements ExtendedMenuProvider<ProjectorBlockEntity.ScreenHandlerData> {
     private static final Logger LOGGER = LogUtils.getLogger();
     public static final float BEACON_MAX_SPEED = 144.0F;
     private static final float BEACON_RAMP_TICKS = 80.0F;
-    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build();
+    public static BlockEntityType<ProjectorBlockEntity> BLOCK_ENTITY_TYPE = BlockEntityType.Builder.of(ProjectorBlockEntity::new, GBlocks.PROJECTOR).build(null);
     public boolean active = false;
     private String channel = "";
     private float rotationBeacon;
@@ -78,6 +78,9 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         }
         be.tickBeaconRotation();
         be.tickProjection(world);
+        if (!world.isClientSide && be.isProjectionVisible()) {
+            ChannelManagerPersistence.get(world).recordProjection(be.channel);
+        }
     }
 
     @Override
@@ -169,6 +172,11 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
                 },
                 (buf) -> new ScreenHandlerData(buf.readUtf(), buf.readBlockPos(), buf.readNbt())
         );
+    }
+
+    @Override
+    public StreamCodec<RegistryFriendlyByteBuf, ScreenHandlerData> getScreenOpeningCodec() {
+        return ScreenHandlerData.CODEC;
     }
 
     @Override

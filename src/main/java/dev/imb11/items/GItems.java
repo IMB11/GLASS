@@ -2,12 +2,10 @@ package dev.imb11.items;
 
 import dev.imb11.Glass;
 import dev.imb11.blocks.GBlocks;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 
 public class GItems {
@@ -21,17 +19,6 @@ public class GItems {
         register("projector", PROJECTOR);
         register("redstone_infused_sand", REDSTONE_INFUSED_SAND);
         register("powerable_glass", POWERABLE_GLASS);
-
-        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(entries -> {
-            entries.accept(TERMINAL);
-            entries.accept(PROJECTOR);
-            entries.accept(REDSTONE_INFUSED_SAND);
-            entries.accept(POWERABLE_GLASS);
-        });
-    }
-
-    public static void initClient() {
-
     }
 
     private static <T extends Item> T register(String id, T item) {

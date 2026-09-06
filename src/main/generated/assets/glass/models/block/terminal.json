@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "minecraft:block/obsidian"
-  }
+  "parent": "glass:block/terminal_camera"
 }

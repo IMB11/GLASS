@@ -23,7 +23,7 @@ import dev.imb11.sync.remote.S2CRemoteSubscriptionPacket;
 import dev.imb11.sync.remote.S2CRemoteUnavailablePacket;
 import dev.imb11.sync.remote.S2CRemoteUnloadPacket;
 import dev.imb11.sync.remote.S2CRemoteWorldStatePacket;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import dev.imb11.platform.ClientNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -71,15 +71,15 @@ public final class RemoteSceneClientManager {
             return;
         }
         receiversRegistered = true;
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteSubscriptionPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteUnavailablePacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteChunkPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteEntitiesPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteBlockEntitiesPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteUnloadPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteBlockUpdatesPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteLightPacket.PACKET_ID, (packet, context) -> accept(packet));
-        ClientPlayNetworking.registerGlobalReceiver(S2CRemoteWorldStatePacket.PACKET_ID, (packet, context) -> accept(packet));
+        ClientNetworking.registerReceiver(S2CRemoteSubscriptionPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteUnavailablePacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteChunkPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteEntitiesPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteBlockEntitiesPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteUnloadPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteBlockUpdatesPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteLightPacket.PACKET_ID, RemoteSceneClientManager::accept);
+        ClientNetworking.registerReceiver(S2CRemoteWorldStatePacket.PACKET_ID, RemoteSceneClientManager::accept);
     }
 
     public static RemoteSceneHandle acquire(RemoteSubscriptionId subscription, ChunkPos cameraCenter, int requestedRadius) {
@@ -572,10 +572,10 @@ public final class RemoteSceneClientManager {
             return false;
         }
         try {
-            if (!ClientPlayNetworking.canSend(packet.type())) {
+            if (!ClientNetworking.canSend(packet.type())) {
                 return false;
             }
-            ClientPlayNetworking.send(packet);
+            ClientNetworking.send(packet);
             return true;
         } catch (IllegalStateException exception) {
             return false;

@@ -1,0 +1,380 @@
+{
+	"format_version": "1.21.1",
+	"credit": "Made with Blockbench",
+	"parent": "minecraft:block/block",
+	"textures": {
+		"0": "block/obsidian",
+		"3": "block/observer_back",
+		"4": "glass:block/terminal_bezel",
+		"5": "glass:block/terminal_lens",
+		"particle": "block/obsidian",
+		"front": "glass:block/terminal_sensor"
+	},
+	"elements": [
+		{
+			"name": "Obsidian body",
+			"from": [0, 0, 1.75],
+			"to": [16, 16, 15],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 16, 16], "texture": "#0"},
+				"east": {"uv": [1, 0, 14.25, 16], "texture": "#0", "cullface": "east"},
+				"south": {"uv": [0, 0, 16, 16], "texture": "#0"},
+				"west": {"uv": [1.75, 0, 15, 16], "texture": "#0", "cullface": "west"},
+				"up": {"uv": [0, 1.75, 16, 15], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [0, 1, 16, 14.25], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Front left",
+			"from": [0, 0, 0],
+			"to": [3, 16, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [13, 0, 16, 16], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 0, 16, 16], "texture": "#0"},
+				"south": {"uv": [0, 0, 3, 16], "texture": "#0"},
+				"west": {"uv": [0, 0, 1.75, 16], "texture": "#0", "cullface": "west"},
+				"up": {"uv": [0, 0, 3, 1.75], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [0, 14.25, 3, 16], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Front right",
+			"from": [13, 0, 0],
+			"to": [16, 16, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 3, 16], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 0, 16, 16], "texture": "#0", "cullface": "east"},
+				"south": {"uv": [13, 0, 16, 16], "texture": "#0"},
+				"west": {"uv": [0, 0, 1.75, 16], "texture": "#0"},
+				"up": {"uv": [13, 0, 16, 1.75], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [13, 14.25, 16, 16], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Front base",
+			"from": [3, 0, 0],
+			"to": [13, 2, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3, 14, 13, 16], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 14, 16, 16], "texture": "#0"},
+				"south": {"uv": [3, 14, 13, 16], "texture": "#0"},
+				"west": {"uv": [0, 14, 1.75, 16], "texture": "#0"},
+				"up": {"uv": [3, 0, 13, 1.75], "texture": "#0"},
+				"down": {"uv": [3, 14.25, 13, 16], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Rear left",
+			"from": [0, 0, 15],
+			"to": [4, 16, 16],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [12, 0, 16, 16], "texture": "#0"},
+				"east": {"uv": [0, 0, 1, 16], "texture": "#0"},
+				"south": {"uv": [0, 0, 4, 16], "texture": "#0", "cullface": "south"},
+				"west": {"uv": [15, 0, 16, 16], "texture": "#0", "cullface": "west"},
+				"up": {"uv": [0, 15, 4, 16], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [0, 0, 4, 1], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Rear right",
+			"from": [12, 0, 15],
+			"to": [16, 16, 16],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 4, 16], "texture": "#0"},
+				"east": {"uv": [0, 0, 1, 16], "texture": "#0", "cullface": "east"},
+				"south": {"uv": [12, 0, 16, 16], "texture": "#0", "cullface": "south"},
+				"west": {"uv": [15, 0, 16, 16], "texture": "#0"},
+				"up": {"uv": [12, 15, 16, 16], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [12, 0, 16, 1], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Rear base",
+			"from": [4, 0, 15],
+			"to": [12, 4, 16],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [4, 12, 12, 16], "texture": "#0"},
+				"east": {"uv": [0, 12, 1, 16], "texture": "#0"},
+				"south": {"uv": [4, 12, 12, 16], "texture": "#0", "cullface": "south"},
+				"west": {"uv": [15, 12, 16, 16], "texture": "#0"},
+				"up": {"uv": [4, 15, 12, 16], "texture": "#0"},
+				"down": {"uv": [4, 0, 12, 1], "texture": "#0", "cullface": "down"}
+			}
+		},
+		{
+			"name": "Rear top",
+			"from": [4, 12, 15],
+			"to": [12, 16, 16],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [4, 0, 12, 4], "texture": "#0"},
+				"east": {"uv": [0, 0, 1, 4], "texture": "#0"},
+				"south": {"uv": [4, 0, 12, 4], "texture": "#0", "cullface": "south"},
+				"west": {"uv": [15, 0, 16, 4], "texture": "#0"},
+				"up": {"uv": [4, 15, 12, 16], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [4, 0, 12, 1], "texture": "#0"}
+			}
+		},
+		{
+			"name": "Front brow top",
+			"from": [3, 15, 0],
+			"to": [13, 16, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3, 0, 13, 1], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 0, 16, 1], "texture": "#0"},
+				"south": {"uv": [3, 0, 13, 1], "texture": "#0"},
+				"west": {"uv": [0, 0, 1.75, 1], "texture": "#0"},
+				"up": {"uv": [3, 0, 13, 1.75], "texture": "#0", "cullface": "up"},
+				"down": {"uv": [3, 14.25, 13, 16], "texture": "#0"}
+			}
+		},
+		{
+			"name": "Front brow base",
+			"from": [3, 12, 0],
+			"to": [13, 13, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3, 3, 13, 4], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 3, 16, 4], "texture": "#0"},
+				"south": {"uv": [3, 3, 13, 4], "texture": "#0"},
+				"west": {"uv": [0, 3, 1.75, 4], "texture": "#0"},
+				"up": {"uv": [3, 0, 13, 1.75], "texture": "#0"},
+				"down": {"uv": [3, 14.25, 13, 16], "texture": "#0"}
+			}
+		},
+		{
+			"name": "Front brow left",
+			"from": [3, 13, 0],
+			"to": [5, 15, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [11, 1, 13, 3], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 1, 16, 3], "texture": "#0"},
+				"south": {"uv": [3, 1, 5, 3], "texture": "#0"},
+				"west": {"uv": [0, 1, 1.75, 3], "texture": "#0"},
+				"up": {"uv": [3, 0, 5, 1.75], "texture": "#0"},
+				"down": {"uv": [3, 14.25, 5, 16], "texture": "#0"}
+			}
+		},
+		{
+			"name": "Front brow right",
+			"from": [11, 13, 0],
+			"to": [13, 15, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3, 1, 5, 3], "texture": "#0", "cullface": "north"},
+				"east": {"uv": [14.25, 1, 16, 3], "texture": "#0"},
+				"south": {"uv": [11, 1, 13, 3], "texture": "#0"},
+				"west": {"uv": [0, 1, 1.75, 3], "texture": "#0"},
+				"up": {"uv": [11, 0, 13, 1.75], "texture": "#0"},
+				"down": {"uv": [11, 14.25, 13, 16], "texture": "#0"}
+			}
+		},
+		{
+			"name": "Lens rim upper",
+			"from": [5, 11, 0.25],
+			"to": [11, 12, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3.2, 0, 12.8, 1.6], "texture": "#4"},
+				"east": {"uv": [14.25, 4, 15.75, 5.5], "texture": "#4"},
+				"west": {"uv": [0.25, 4, 1.75, 5.5], "texture": "#4"},
+				"up": {"uv": [5, 0.25, 11, 1.75], "texture": "#4"},
+				"down": {"uv": [5, 14.25, 11, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim lower",
+			"from": [5, 2, 0.25],
+			"to": [11, 3, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [3.2, 14.4, 12.8, 16], "texture": "#4"},
+				"east": {"uv": [14.25, 12.5, 15.75, 14], "texture": "#4"},
+				"west": {"uv": [0.25, 12.5, 1.75, 14], "texture": "#4"},
+				"up": {"uv": [5, 0.25, 11, 1.75], "texture": "#4"},
+				"down": {"uv": [5, 14.25, 11, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim left",
+			"from": [3, 4, 0.25],
+			"to": [4.5, 10, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [13.6, 3.2, 16, 12.8], "texture": "#4"},
+				"east": {"uv": [14.25, 6, 15.75, 12], "texture": "#4"},
+				"west": {"uv": [0.25, 6, 1.75, 12], "texture": "#4"},
+				"up": {"uv": [3, 0.25, 4.5, 1.75], "texture": "#4"},
+				"down": {"uv": [3, 14.25, 4.5, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim right",
+			"from": [11.5, 4, 0.25],
+			"to": [13, 10, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 3.2, 2.4, 12.8], "texture": "#4"},
+				"east": {"uv": [14.25, 6, 15.75, 12], "texture": "#4"},
+				"west": {"uv": [0.25, 6, 1.75, 12], "texture": "#4"},
+				"up": {"uv": [11.5, 0.25, 13, 1.75], "texture": "#4"},
+				"down": {"uv": [11.5, 14.25, 13, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim upper left",
+			"from": [4, 10, 0.25],
+			"to": [5.5, 11, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [12, 1.6, 14.4, 3.2], "texture": "#4"},
+				"east": {"uv": [14.25, 5, 15.75, 6], "texture": "#4"},
+				"west": {"uv": [0.25, 5, 1.75, 6], "texture": "#4"},
+				"up": {"uv": [4, 0.25, 5.5, 1.75], "texture": "#4"},
+				"down": {"uv": [4, 14.25, 5.5, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim upper right",
+			"from": [10.5, 10, 0.25],
+			"to": [12, 11, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [1.6, 1.6, 4, 3.2], "texture": "#4"},
+				"east": {"uv": [14.25, 5, 15.75, 6], "texture": "#4"},
+				"west": {"uv": [0.25, 5, 1.75, 6], "texture": "#4"},
+				"up": {"uv": [10.5, 0.25, 12, 1.75], "texture": "#4"},
+				"down": {"uv": [10.5, 14.25, 12, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim lower left",
+			"from": [4, 3, 0.25],
+			"to": [5.5, 4, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [12, 12.8, 14.4, 14.4], "texture": "#4"},
+				"east": {"uv": [14.25, 12, 15.75, 13], "texture": "#4"},
+				"west": {"uv": [0.25, 12, 1.75, 13], "texture": "#4"},
+				"up": {"uv": [4, 0.25, 5.5, 1.75], "texture": "#4"},
+				"down": {"uv": [4, 14.25, 5.5, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Lens rim lower right",
+			"from": [10.5, 3, 0.25],
+			"to": [12, 4, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [1.6, 12.8, 4, 14.4], "texture": "#4"},
+				"east": {"uv": [14.25, 12, 15.75, 13], "texture": "#4"},
+				"west": {"uv": [0.25, 12, 1.75, 13], "texture": "#4"},
+				"up": {"uv": [10.5, 0.25, 12, 1.75], "texture": "#4"},
+				"down": {"uv": [10.5, 14.25, 12, 15.75], "texture": "#4"}
+			}
+		},
+		{
+			"name": "Rear observer control",
+			"from": [4, 4, 15],
+			"to": [12, 12, 15.875],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"east": {"uv": [0.125, 4, 1, 12], "texture": "#3"},
+				"south": {"uv": [0, 0, 16, 16], "texture": "#3"},
+				"west": {"uv": [15, 4, 15.875, 12], "texture": "#3"},
+				"up": {"uv": [4, 15, 12, 15.875], "texture": "#3"},
+				"down": {"uv": [4, 0.125, 12, 1], "texture": "#3"}
+			}
+		},
+		{
+			"name": "Observer sensor pair",
+			"from": [5, 13, 0.0625],
+			"to": [11, 15, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 16, 16], "texture": "#front"},
+				"east": {"uv": [14.25, 1, 15.9375, 3], "texture": "#front"},
+				"west": {"uv": [0.0625, 1, 1.75, 3], "texture": "#front"},
+				"up": {"uv": [5, 0.0625, 11, 1.75], "texture": "#front"},
+				"down": {"uv": [5, 14.25, 11, 15.9375], "texture": "#front"}
+			}
+		},
+		{
+			"name": "Recessed diamond lens",
+			"from": [4, 3, 0.875],
+			"to": [12, 11, 1.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 8]},
+			"faces": {
+				"north": {"uv": [0, 0, 16, 16], "texture": "#5"},
+				"east": {"uv": [14.25, 5.5, 15.125, 12.5], "texture": "#5"},
+				"west": {"uv": [0.875, 5.5, 1.75, 12.5], "texture": "#5"},
+				"up": {"uv": [4.5, 0.875, 11.5, 1.75], "texture": "#5"},
+				"down": {"uv": [4.5, 14.25, 11.5, 15.125], "texture": "#5"}
+			}
+		}
+	],
+	"display": {
+		"thirdperson_righthand": {
+			"rotation": [75, 45, 0],
+			"translation": [0, 2.5, 0],
+			"scale": [0.375, 0.375, 0.375]
+		},
+		"thirdperson_lefthand": {
+			"rotation": [75, 45, 0],
+			"translation": [0, 2.5, 0],
+			"scale": [0.375, 0.375, 0.375]
+		},
+		"firstperson_righthand": {
+			"rotation": [0, 45, 0],
+			"scale": [0.4, 0.4, 0.4]
+		},
+		"firstperson_lefthand": {
+			"rotation": [0, -135, 0],
+			"scale": [0.4, 0.4, 0.4]
+		},
+		"ground": {
+			"translation": [0, 3, 0],
+			"scale": [0.25, 0.25, 0.25]
+		},
+		"gui": {
+			"rotation": [30, 135, 0],
+			"scale": [0.625, 0.625, 0.625]
+		},
+		"fixed": {
+			"scale": [0.5, 0.5, 0.5]
+		}
+	},
+	"groups": [
+		{
+			"name": "Obsidian enclosure",
+			"origin": [8, 8, 8],
+			"scope": 0,
+			"color": 0,
+			"children": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+		},
+		{
+			"name": "Observer housing",
+			"origin": [8, 8, 8],
+			"scope": 0,
+			"color": 0,
+			"children": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+		},
+		{
+			"name": "Diamond optics",
+			"origin": [8, 8, 8],
+			"scope": 0,
+			"color": 0,
+			"children": [22]
+		}
+	]
+}

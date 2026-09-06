@@ -7,13 +7,7 @@ import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.mixins.ChunkMapAccessor;
 import dev.imb11.mixins.TrackedEntityAccessor;
 import dev.imb11.sync.ChannelManagerPersistence;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
-import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import dev.imb11.platform.PlatformNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -93,14 +87,6 @@ public final class RemoteSceneServerManager {
             .thenComparingLong(TicketKey::chunk);
     private static final TicketType<TicketKey> REMOTE_TICKET = TicketType.create("glass_remote_scene", TICKET_COMPARATOR, TICKET_TIMEOUT_TICKS);
 
-    public static void init() {
-        ServerTickEvents.END_SERVER_TICK.register(RemoteSceneServerManager::tick);
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> removePlayer(server, handler.getPlayer(), false));
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> removePlayer(destination.getServer(), player, true));
-        ServerWorldEvents.UNLOAD.register(RemoteSceneServerManager::unloadWorld);
-        ServerLifecycleEvents.SERVER_STOPPING.register(RemoteSceneServerManager::stop);
-    }
-
     public static void subscribe(ServerPlayer player, C2SRemoteSubscribePacket packet) {
         MinecraftServer server = player.getServer();
         if (server == null) {
@@ -138,7 +124,7 @@ public final class RemoteSceneServerManager {
                 && projectorLevel.getBlockEntity(id.projectorPos()) instanceof ProjectorBlockEntity projector
                 && projector.getChannel().equals(id.source().channel())
                 && ChannelManagerPersistence.get(server).resolve(id.source().channel()).filter(id.source()::equals).isPresent()
-                && PlayerLookup.tracking(projectorLevel, id.projectorPos()).contains(player)
+                && PlatformNetworking.tracking(projectorLevel, id.projectorPos()).contains(player)
                 && chunkDistance(new ChunkPos(id.source().pos()), packet.cameraCenter()) <= SOURCE_CAMERA_BUDGET;
         if (playerState.subscriptions.size() - replacements.size() >= MAX_SUBSCRIPTIONS_PER_PLAYER
                 || packet.requestedRadius() < 1
@@ -188,7 +174,7 @@ public final class RemoteSceneServerManager {
                 && projectorLevel.getBlockEntity(id.projectorPos()) instanceof ProjectorBlockEntity projector
                 && projector.getChannel().equals(id.source().channel())
                 && ChannelManagerPersistence.get(server).resolve(id.source().channel()).filter(id.source()::equals).isPresent()
-                && PlayerLookup.tracking(projectorLevel, id.projectorPos()).contains(player)
+                && PlatformNetworking.tracking(projectorLevel, id.projectorPos()).contains(player)
                 && chunkDistance(new ChunkPos(id.source().pos()), packet.cameraCenter()) <= SOURCE_CAMERA_BUDGET;
         if (subscription == null
                 || packet.requestedRadius() < 1
@@ -390,7 +376,7 @@ public final class RemoteSceneServerManager {
                             continue;
                         }
                         subscription.entities.add(entity.getId());
-                        ((TrackedEntityAccessor) tracker).glass$getServerEntity().sendPairingData(player,
+                        PlatformNetworking.sendPairingData(((TrackedEntityAccessor) tracker).glass$getServerEntity(), player,
                                 packet -> queueEntityPacket(subscription, entity.getId(), packet));
                         spawned++;
                     }
@@ -468,7 +454,7 @@ public final class RemoteSceneServerManager {
         }
     }
 
-    private static void tick(MinecraftServer server) {
+    public static void tick(MinecraftServer server) {
         ServerState state = STATES.get(server);
         if (state == null) {
             return;
@@ -498,7 +484,7 @@ public final class RemoteSceneServerManager {
                         && projectorLevel.getBlockEntity(id.projectorPos()) instanceof ProjectorBlockEntity projector
                         && projector.getChannel().equals(id.source().channel())
                         && ChannelManagerPersistence.get(server).resolve(id.source().channel()).filter(id.source()::equals).isPresent()
-                        && PlayerLookup.tracking(projectorLevel, id.projectorPos()).contains(player)
+                        && PlatformNetworking.tracking(projectorLevel, id.projectorPos()).contains(player)
                         && chunkDistance(new ChunkPos(id.source().pos()), subscription.requestedCenter) <= SOURCE_CAMERA_BUDGET;
                 if (player == null || now - subscription.lastSeenTick > SUBSCRIPTION_TIMEOUT_TICKS) {
                     removals.add(new Removal(playerEntry.getKey(), subscription, S2CRemoteUnavailablePacket.Reason.TIMEOUT));
@@ -545,7 +531,7 @@ public final class RemoteSceneServerManager {
                 + " projectorChannel=" + (projector == null ? "none" : projector.getChannel())
                 + " projectorPowered=" + (projector != null && projector.isActive())
                 + " currentSource=" + ChannelManagerPersistence.get(server).resolve(id.source().channel()).orElse(null)
-                + " tracking=" + (projectorChunkLoaded && player != null && PlayerLookup.tracking(projectorLevel, id.projectorPos()).contains(player))
+                + " tracking=" + (projectorChunkLoaded && player != null && PlatformNetworking.tracking(projectorLevel, id.projectorPos()).contains(player))
                 + " center=" + center + " safeCenter=" + safeCenter(center)
                 + " sourceCameraDistance=" + chunkDistance(new ChunkPos(id.source().pos()), center);
     }
@@ -1064,7 +1050,7 @@ public final class RemoteSceneServerManager {
         );
     }
 
-    private static void removePlayer(MinecraftServer server, ServerPlayer player, boolean notify) {
+    public static void removePlayer(MinecraftServer server, ServerPlayer player, boolean notify) {
         if (!server.isSameThread()) {
             server.execute(() -> removePlayer(server, player, notify));
             return;
@@ -1083,7 +1069,7 @@ public final class RemoteSceneServerManager {
         rebalance(server, state);
     }
 
-    private static void unloadWorld(MinecraftServer server, ServerLevel world) {
+    public static void unloadWorld(MinecraftServer server, ServerLevel world) {
         ServerState state = STATES.get(server);
         if (state == null) {
             return;
@@ -1106,7 +1092,7 @@ public final class RemoteSceneServerManager {
         rebalance(server, state);
     }
 
-    private static void stop(MinecraftServer server) {
+    public static void stop(MinecraftServer server) {
         ServerState state = STATES.remove(server);
         if (state == null) {
             return;
@@ -1162,8 +1148,8 @@ public final class RemoteSceneServerManager {
     }
 
     private static void send(ServerPlayer player, CustomPacketPayload payload) {
-        if (player != null && ServerPlayNetworking.canSend(player, payload.type())) {
-            ServerPlayNetworking.send(player, payload);
+        if (player != null && PlatformNetworking.canSend(player, payload.type())) {
+            PlatformNetworking.send(player, payload);
         }
     }
 

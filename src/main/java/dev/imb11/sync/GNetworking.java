@@ -25,11 +25,7 @@ import dev.imb11.sync.remote.S2CRemoteSubscriptionPacket;
 import dev.imb11.sync.remote.S2CRemoteUnavailablePacket;
 import dev.imb11.sync.remote.S2CRemoteUnloadPacket;
 import dev.imb11.sync.remote.S2CRemoteWorldStatePacket;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import dev.imb11.platform.PlatformNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,53 +34,38 @@ public final class GNetworking {
     private static final double MAX_INTERACTION_DISTANCE_SQUARED = 64.0D;
 
     public static void initialize() {
-        PayloadTypeRegistry.playC2S().register(C2SCreateChannelPacket.PACKET_ID, C2SCreateChannelPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SDeleteChannelPacket.PACKET_ID, C2SDeleteChannelPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2STerminalChannelChangedPacket.PACKET_ID, C2STerminalChannelChangedPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SRemoveLinkedChannelPacket.PACKET_ID, C2SRemoveLinkedChannelPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SProjectorChannelChangedPacket.PACKET_ID, C2SProjectorChannelChangedPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SRemoteSubscribePacket.PACKET_ID, C2SRemoteSubscribePacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SRemoteChunkAckPacket.PACKET_ID, C2SRemoteChunkAckPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SRemoteUpdatePacket.PACKET_ID, C2SRemoteUpdatePacket.PACKET_CODEC);
-        PayloadTypeRegistry.playC2S().register(C2SRemoteUnsubscribePacket.PACKET_ID, C2SRemoteUnsubscribePacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CChannelSnapshotPacket.PACKET_ID, S2CChannelSnapshotPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteSubscriptionPacket.PACKET_ID, S2CRemoteSubscriptionPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteUnavailablePacket.PACKET_ID, S2CRemoteUnavailablePacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteChunkPacket.PACKET_ID, S2CRemoteChunkPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteEntitiesPacket.PACKET_ID, S2CRemoteEntitiesPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteBlockEntitiesPacket.PACKET_ID, S2CRemoteBlockEntitiesPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteUnloadPacket.PACKET_ID, S2CRemoteUnloadPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteBlockUpdatesPacket.PACKET_ID, S2CRemoteBlockUpdatesPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteLightPacket.PACKET_ID, S2CRemoteLightPacket.PACKET_CODEC);
-        PayloadTypeRegistry.playS2C().register(S2CRemoteWorldStatePacket.PACKET_ID, S2CRemoteWorldStatePacket.PACKET_CODEC);
-
-        ServerPlayNetworking.registerGlobalReceiver(C2SCreateChannelPacket.PACKET_ID, C2SCreateChannelPacket::receive);
-        ServerPlayNetworking.registerGlobalReceiver(C2SDeleteChannelPacket.PACKET_ID, C2SDeleteChannelPacket::receive);
-        ServerPlayNetworking.registerGlobalReceiver(C2STerminalChannelChangedPacket.PACKET_ID, C2STerminalChannelChangedPacket::receive);
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoveLinkedChannelPacket.PACKET_ID, C2SRemoveLinkedChannelPacket::receive);
-        ServerPlayNetworking.registerGlobalReceiver(C2SProjectorChannelChangedPacket.PACKET_ID, C2SProjectorChannelChangedPacket::receive);
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoteSubscribePacket.PACKET_ID, (payload, context) -> RemoteSceneServerManager.subscribe(context.player(), payload));
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoteChunkAckPacket.PACKET_ID, (payload, context) -> RemoteSceneServerManager.acknowledge(context.player(), payload));
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoteUpdatePacket.PACKET_ID, (payload, context) -> RemoteSceneServerManager.update(context.player(), payload));
-        ServerPlayNetworking.registerGlobalReceiver(C2SRemoteUnsubscribePacket.PACKET_ID, (payload, context) -> RemoteSceneServerManager.unsubscribe(context.player(), payload));
-
-        RemoteSceneServerManager.init();
-
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendSnapshot(handler.getPlayer()));
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> sendSnapshot(player));
+        PlatformNetworking.registerServerbound(C2SCreateChannelPacket.PACKET_ID, C2SCreateChannelPacket.PACKET_CODEC, C2SCreateChannelPacket::receive);
+        PlatformNetworking.registerServerbound(C2SDeleteChannelPacket.PACKET_ID, C2SDeleteChannelPacket.PACKET_CODEC, C2SDeleteChannelPacket::receive);
+        PlatformNetworking.registerServerbound(C2STerminalChannelChangedPacket.PACKET_ID, C2STerminalChannelChangedPacket.PACKET_CODEC, C2STerminalChannelChangedPacket::receive);
+        PlatformNetworking.registerServerbound(C2SRemoveLinkedChannelPacket.PACKET_ID, C2SRemoveLinkedChannelPacket.PACKET_CODEC, C2SRemoveLinkedChannelPacket::receive);
+        PlatformNetworking.registerServerbound(C2SProjectorChannelChangedPacket.PACKET_ID, C2SProjectorChannelChangedPacket.PACKET_CODEC, C2SProjectorChannelChangedPacket::receive);
+        PlatformNetworking.registerServerbound(C2SRemoteSubscribePacket.PACKET_ID, C2SRemoteSubscribePacket.PACKET_CODEC, (payload, player) -> RemoteSceneServerManager.subscribe(player, payload));
+        PlatformNetworking.registerServerbound(C2SRemoteChunkAckPacket.PACKET_ID, C2SRemoteChunkAckPacket.PACKET_CODEC, (payload, player) -> RemoteSceneServerManager.acknowledge(player, payload));
+        PlatformNetworking.registerServerbound(C2SRemoteUpdatePacket.PACKET_ID, C2SRemoteUpdatePacket.PACKET_CODEC, (payload, player) -> RemoteSceneServerManager.update(player, payload));
+        PlatformNetworking.registerServerbound(C2SRemoteUnsubscribePacket.PACKET_ID, C2SRemoteUnsubscribePacket.PACKET_CODEC, (payload, player) -> RemoteSceneServerManager.unsubscribe(player, payload));
+        PlatformNetworking.registerClientbound(S2CChannelSnapshotPacket.PACKET_ID, S2CChannelSnapshotPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteSubscriptionPacket.PACKET_ID, S2CRemoteSubscriptionPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteUnavailablePacket.PACKET_ID, S2CRemoteUnavailablePacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteChunkPacket.PACKET_ID, S2CRemoteChunkPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteEntitiesPacket.PACKET_ID, S2CRemoteEntitiesPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteBlockEntitiesPacket.PACKET_ID, S2CRemoteBlockEntitiesPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteUnloadPacket.PACKET_ID, S2CRemoteUnloadPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteBlockUpdatesPacket.PACKET_ID, S2CRemoteBlockUpdatesPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteLightPacket.PACKET_ID, S2CRemoteLightPacket.PACKET_CODEC);
+        PlatformNetworking.registerClientbound(S2CRemoteWorldStatePacket.PACKET_ID, S2CRemoteWorldStatePacket.PACKET_CODEC);
     }
 
     public static void sendSnapshot(ServerPlayer player) {
-        if (ServerPlayNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
-            ServerPlayNetworking.send(player, ChannelManagerPersistence.get(player.serverLevel().getServer()).snapshotPacket());
+        if (PlatformNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
+            PlatformNetworking.send(player, ChannelManagerPersistence.get(player.serverLevel().getServer()).snapshotPacket());
         }
     }
 
     public static void broadcastSnapshot(MinecraftServer server, ChannelManagerPersistence persistence) {
         S2CChannelSnapshotPacket snapshot = persistence.snapshotPacket();
-        for (ServerPlayer player : PlayerLookup.all(server)) {
-            if (ServerPlayNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
-                ServerPlayNetworking.send(player, snapshot);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (PlatformNetworking.canSend(player, S2CChannelSnapshotPacket.PACKET_ID)) {
+                PlatformNetworking.send(player, snapshot);
             }
         }
     }

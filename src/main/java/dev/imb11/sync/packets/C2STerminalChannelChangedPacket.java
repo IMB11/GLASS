@@ -4,7 +4,7 @@ import dev.imb11.blocks.TerminalBlock;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GNetworking;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -23,15 +23,15 @@ public record C2STerminalChannelChangedPacket(BlockPos pos, String channel) impl
         return PACKET_ID;
     }
 
-    public static void receive(C2STerminalChannelChangedPacket payload, ServerPlayNetworking.Context context) {
-        if (!GNetworking.canUseTerminal(context.player(), payload.pos())) {
+    public static void receive(C2STerminalChannelChangedPacket payload, ServerPlayer player) {
+        if (!GNetworking.canUseTerminal(player, payload.pos())) {
             return;
         }
         String channel = ChannelManagerPersistence.canonicalChannelName(payload.channel());
         if (channel == null) {
             return;
         }
-        var level = context.player().serverLevel();
+        var level = player.serverLevel();
         if (!(level.getBlockEntity(payload.pos()) instanceof TerminalBlockEntity terminal)) {
             return;
         }

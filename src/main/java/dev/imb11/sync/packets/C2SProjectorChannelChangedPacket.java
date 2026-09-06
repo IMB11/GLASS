@@ -3,7 +3,7 @@ package dev.imb11.sync.packets;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
 import dev.imb11.sync.ChannelManagerPersistence;
 import dev.imb11.sync.GNetworking;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -22,12 +22,12 @@ public record C2SProjectorChannelChangedPacket(BlockPos pos, String channel) imp
         return PACKET_ID;
     }
 
-    public static void receive(C2SProjectorChannelChangedPacket payload, ServerPlayNetworking.Context context) {
-        if (!GNetworking.canUseProjector(context.player(), payload.pos())) {
+    public static void receive(C2SProjectorChannelChangedPacket payload, ServerPlayer player) {
+        if (!GNetworking.canUseProjector(player, payload.pos())) {
             return;
         }
         String channel = ChannelManagerPersistence.canonicalChannelName(payload.channel());
-        var level = context.player().serverLevel();
+        var level = player.serverLevel();
         ChannelManagerPersistence manager = ChannelManagerPersistence.get(level);
         if (channel != null && manager.containsName(channel) && level.getBlockEntity(payload.pos()) instanceof ProjectorBlockEntity projector) {
             projector.setChannelFromServer(channel);

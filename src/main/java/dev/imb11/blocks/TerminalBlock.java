@@ -3,7 +3,8 @@ package dev.imb11.blocks;
 import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.TerminalBlockEntity;
 import dev.imb11.sync.ChannelManagerPersistence;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
+import dev.imb11.platform.ExtendedMenuProvider;
+import dev.imb11.platform.Platform;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
@@ -26,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 public class TerminalBlock extends BaseEntityBlock {
     public TerminalBlock(Properties settings) {
         super(settings);
+        registerDefaultState(defaultBlockState().setValue(PROJECTING, false));
     }
 
     @Override
@@ -34,6 +37,7 @@ public class TerminalBlock extends BaseEntityBlock {
     }
 
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
+    public static final BooleanProperty PROJECTING = BooleanProperty.create("projecting");
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
@@ -60,16 +64,16 @@ public class TerminalBlock extends BaseEntityBlock {
             return InteractionResult.PASS;
         }
 
-        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.getMenuProvider(world, pos);
+        ExtendedMenuProvider<?> handlerFactory = (ExtendedMenuProvider<?>) state.getMenuProvider(world, pos);
 
-        player.openMenu(handlerFactory);
+        Platform.openMenu(player, handlerFactory);
 
         return InteractionResult.SUCCESS;
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, PROJECTING);
     }
 
     @Nullable

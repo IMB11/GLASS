@@ -10,7 +10,7 @@ import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.imb11.projection.ProjectionSurface;
-import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
+import dev.imb11.client.ShaderRegistrar;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
@@ -74,7 +74,7 @@ public final class ProjectionSurfaceRenderer {
     private ProjectionSurfaceRenderer() {
     }
 
-    public static void registerShader(CoreShaderRegistrationCallback.RegistrationContext context) throws IOException {
+    public static void registerShader(ShaderRegistrar context) throws IOException {
         context.register(
                 SHADER_LOCATION,
                 DefaultVertexFormat.POSITION_TEX_COLOR,

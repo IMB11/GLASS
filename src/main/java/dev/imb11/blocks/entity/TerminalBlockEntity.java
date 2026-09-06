@@ -4,8 +4,8 @@ import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.TerminalBlock;
 import dev.imb11.client.gui.TerminalBlockGUI;
 import dev.imb11.sync.ChannelManagerPersistence;
-import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
+import dev.imb11.platform.PlatformBlockEntity;
+import dev.imb11.platform.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -30,8 +30,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory {
-    public static BlockEntityType<TerminalBlockEntity> BLOCK_ENTITY_TYPE = FabricBlockEntityTypeBuilder.create(TerminalBlockEntity::new, GBlocks.TERMINAL).build();
+public class TerminalBlockEntity extends PlatformBlockEntity implements ExtendedMenuProvider<TerminalBlockEntity.ScreenHandlerData> {
+    public static BlockEntityType<TerminalBlockEntity> BLOCK_ENTITY_TYPE = BlockEntityType.Builder.of(TerminalBlockEntity::new, GBlocks.TERMINAL).build(null);
 
     private String channel = "";
     private Direction reconciledFacing;
@@ -45,11 +45,15 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
             return;
         }
         Direction facing = state.getValue(TerminalBlock.FACING);
-        if (terminal.reconciledFacing == facing) {
-            return;
+        ChannelManagerPersistence channels = ChannelManagerPersistence.get(serverLevel);
+        if (terminal.reconciledFacing != facing) {
+            terminal.reconciledFacing = facing;
+            channels.reconcileTerminal(terminal);
         }
-        terminal.reconciledFacing = facing;
-        ChannelManagerPersistence.get(serverLevel).reconcileTerminal(terminal);
+        boolean projecting = channels.isProjecting(serverLevel, pos, terminal.channel);
+        if (state.getValue(TerminalBlock.PROJECTING) != projecting) {
+            level.setBlock(pos, state.setValue(TerminalBlock.PROJECTING, projecting), Block.UPDATE_CLIENTS);
+        }
     }
 
     @Override
@@ -121,6 +125,11 @@ public class TerminalBlockEntity extends BlockEntity implements ExtendedScreenHa
                     return new ScreenHandlerData(pos, channelManagerNbt);
                 }
         );
+    }
+
+    @Override
+    public StreamCodec<RegistryFriendlyByteBuf, ScreenHandlerData> getScreenOpeningCodec() {
+        return ScreenHandlerData.CODEC;
     }
 
     @Override

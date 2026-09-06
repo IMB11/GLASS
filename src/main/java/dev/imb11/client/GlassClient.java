@@ -1,74 +1,64 @@
 package dev.imb11.client;
 
-import dev.imb11.blocks.GBlocks;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
-import dev.imb11.client.gui.ProjectorBlockGUI;
-import dev.imb11.client.gui.ProjectorBlockScreen;
-import dev.imb11.client.gui.TerminalBlockGUI;
-import dev.imb11.client.gui.TerminalBlockScreen;
 import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import dev.imb11.client.renderer.projection.ProjectionSurfaceRenderer;
 import dev.imb11.client.remote.RemoteSceneClientManager;
+import dev.imb11.platform.ClientNetworking;
 import dev.imb11.sync.packets.S2CChannelSnapshotPacket;
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.InvalidateRenderStateCallback;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.io.IOException;
 
-public class GlassClient implements ClientModInitializer {
+public final class GlassClient {
     private static volatile ClientLevel activeLevel;
 
-    @Override
-    public void onInitializeClient() {
-        GBlocks.initClient();
-        CoreShaderRegistrationCallback.EVENT.register(GlassClient::registerProjectionShader);
-        InvalidateRenderStateCallback.EVENT.register(ProjectionSurfaceRenderer::invalidate);
-        InvalidateRenderStateCallback.EVENT.register(ProjectorBlockEntityRenderer::reset);
-        ClientPlayNetworking.registerGlobalReceiver(
-                S2CChannelSnapshotPacket.PACKET_ID,
-                (packet, context) -> ClientProjectionSourceRegistry.applySnapshot(packet)
-        );
-        RemoteSceneClientManager.registerReceivers();
-        ClientPlayConnectionEvents.INIT.register((handler, client) -> clearConnection());
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearConnection());
-        ClientTickEvents.START_CLIENT_TICK.register(GlassClient::trackLevel);
-        ClientTickEvents.START_CLIENT_TICK.register(RemoteSceneClientManager::tick);
-        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) ->
-                ProjectionRenderManager.onClientChunkUnloaded(level, chunk.getPos())
-        );
-        ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, level) -> {
-            if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
-                ProjectorBlockEntityRenderer.registerLoaded(level, projector);
-            }
-        });
-        ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.register((blockEntity, level) -> {
-            if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
-                ProjectorBlockEntityRenderer.unregisterLoaded(level, projector);
-                ProjectionSurfaceRenderer.release(level, projector.getBlockPos());
-                ProjectorBlockEntityRenderer.release(level, projector.getBlockPos());
-                ProjectionRenderManager.releaseProjector(level, projector.getBlockPos());
-            }
-        });
-
-        MenuScreens.<TerminalBlockGUI, TerminalBlockScreen>register(TerminalBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new TerminalBlockScreen(gui, inventory.player, title));
-        MenuScreens.<ProjectorBlockGUI, ProjectorBlockScreen>register(ProjectorBlockGUI.SCREEN_HANDLER_TYPE, (gui, inventory, title) -> new ProjectorBlockScreen(gui, inventory.player, title));
+    private GlassClient() {
     }
 
-    private static void registerProjectionShader(CoreShaderRegistrationCallback.RegistrationContext context) throws IOException {
+    public static void initialize() {
+        ClientNetworking.registerReceiver(S2CChannelSnapshotPacket.PACKET_ID, ClientProjectionSourceRegistry::applySnapshot);
+        RemoteSceneClientManager.registerReceivers();
+    }
+
+    public static void registerProjectionShader(ShaderRegistrar registrar) throws IOException {
         ProjectionRenderManager.reset();
         RemoteSceneClientManager.onResourceReload();
         ProjectorBlockEntityRenderer.reset();
-        ProjectionSurfaceRenderer.registerShader(context);
+        ProjectionSurfaceRenderer.registerShader(registrar);
+    }
+
+    public static void invalidateRenderState() {
+        ProjectionSurfaceRenderer.invalidate();
+        ProjectorBlockEntityRenderer.reset();
+    }
+
+    public static void onChunkUnload(ClientLevel level, LevelChunk chunk) {
+        ProjectionRenderManager.onClientChunkUnloaded(level, chunk.getPos());
+    }
+
+    public static void onBlockEntityLoad(BlockEntity blockEntity, ClientLevel level) {
+        if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
+            ProjectorBlockEntityRenderer.registerLoaded(level, projector);
+        }
+    }
+
+    public static void onBlockEntityUnload(BlockEntity blockEntity, ClientLevel level) {
+        if (level == Minecraft.getInstance().level && blockEntity instanceof ProjectorBlockEntity projector) {
+            ProjectorBlockEntityRenderer.unregisterLoaded(level, projector);
+            ProjectionSurfaceRenderer.release(level, projector.getBlockPos());
+            ProjectorBlockEntityRenderer.release(level, projector.getBlockPos());
+            ProjectionRenderManager.releaseProjector(level, projector.getBlockPos());
+        }
+    }
+
+    public static void tick(Minecraft minecraft) {
+        trackLevel(minecraft);
+        RemoteSceneClientManager.tick(minecraft);
     }
 
     private static void trackLevel(Minecraft minecraft) {
@@ -92,7 +82,7 @@ public class GlassClient implements ClientModInitializer {
         RemoteSceneClientManager.onMainLevelChanged(currentLevel);
     }
 
-    private static void clearConnection() {
+    public static void clearConnection() {
         Minecraft minecraft = Minecraft.getInstance();
         if (!minecraft.isSameThread()) {
             minecraft.execute(GlassClient::clearConnection);

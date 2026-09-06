@@ -2,8 +2,10 @@ package dev.imb11.blocks;
 
 import com.mojang.serialization.MapCodec;
 import dev.imb11.blocks.entity.ProjectorBlockEntity;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
+import dev.imb11.platform.ExtendedMenuProvider;
+import dev.imb11.platform.Platform;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -67,9 +69,9 @@ public class ProjectorBlock extends BaseEntityBlock {
             return InteractionResult.PASS;
         }
 
-        ExtendedScreenHandlerFactory handlerFactory = (ExtendedScreenHandlerFactory) state.getMenuProvider(world, pos);
+        ExtendedMenuProvider<?> handlerFactory = (ExtendedMenuProvider<?>) state.getMenuProvider(world, pos);
 
-        player.openMenu(handlerFactory);
+        Platform.openMenu(player, handlerFactory);
 
         return InteractionResult.SUCCESS;
     }
@@ -77,6 +79,12 @@ public class ProjectorBlock extends BaseEntityBlock {
     @Override
     public RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    @Override
+    public boolean skipRendering(BlockState state, BlockState adjacentState, Direction direction) {
+        return adjacentState.is(this) || adjacentState.is(GBlocks.POWERABLE_GLASS)
+                || super.skipRendering(state, adjacentState, direction);
     }
 
     @Nullable

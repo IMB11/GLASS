@@ -1,6 +1,7 @@
 package dev.imb11.mixins;
 
 import dev.imb11.client.renderer.block.ProjectorBlockEntityRenderer;
+import dev.imb11.client.GlassClient;
 import dev.imb11.client.renderer.projection.ProjectionRenderContext;
 import dev.imb11.client.renderer.projection.ProjectionRenderManager;
 import net.minecraft.client.Camera;
@@ -63,6 +64,11 @@ abstract class LevelRendererMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void glass$mirrorMainRendererTick(CallbackInfo callbackInfo) {
         ProjectionRenderManager.onMainRendererTick((LevelRenderer) (Object) this);
+    }
+
+    @Inject(method = "allChanged", at = @At("HEAD"))
+    private void glass$invalidateRenderState(CallbackInfo callbackInfo) {
+        GlassClient.invalidateRenderState();
     }
 
     @Inject(method = "allChanged", at = @At("TAIL"))
