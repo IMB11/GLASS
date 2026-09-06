@@ -16,6 +16,9 @@
         ],
         "main": [
             "dev.imb11.Glass"
+        ],
+        "fabric-datagen": [
+            "dev.imb11.datagen.GlassDataGenerator"
         ]
     },
     "mixins": [

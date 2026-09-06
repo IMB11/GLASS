@@ -51,6 +51,12 @@ loom {
     accessWidenerPath = file('src/main/resources/glass.accesswidener')
 }
 
+fabricApi {
+    configureDataGeneration {
+        client = true
+    }
+}
+
 dependencies {
 
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -97,6 +103,12 @@ java {
     }
 
     withSourcesJar()
+}
+
+tasks.named('runDatagen', JavaExec) {
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
 }
 
 jar {

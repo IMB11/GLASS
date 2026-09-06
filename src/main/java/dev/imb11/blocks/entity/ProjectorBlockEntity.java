@@ -29,7 +29,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -284,7 +283,7 @@ public class ProjectorBlockEntity extends BlockEntity implements ExtendedScreenH
         if (!world.getChunkSource().hasChunk(chunkX, chunkZ)) {
             return ProjectionSurface.BlockSample.UNLOADED;
         }
-        return world.getBlockState(position).is(Blocks.GLASS)
+        return world.getBlockState(position).is(GBlocks.POWERABLE_GLASS)
                 ? ProjectionSurface.BlockSample.GLASS
                 : ProjectionSurface.BlockSample.OTHER;
     }

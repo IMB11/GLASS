@@ -1,6 +1,0 @@
-{
-  "variants": {
-    "powered=false": { "model": "glass:block/projector" },
-    "powered=true": { "model": "glass:block/projector" }
-  }
-}

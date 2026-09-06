@@ -1,6 +1,8 @@
 {
-  "block.glass.terminal": "G.L.A.S.S Terminal",
+  "block.glass.powerable_glass": "Powerable Glass",
   "block.glass.projector": "G.L.A.S.S Projector",
+  "block.glass.redstone_infused_sand": "Redstone Infused Sand",
+  "block.glass.terminal": "G.L.A.S.S Terminal",
   "subtitles.glass.projection.panel_activate": "Projection panel activates",
   "subtitles.glass.projection.panel_deactivate": "Projection panel deactivates"
 }

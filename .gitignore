@@ -87,6 +87,8 @@ gradle-app.setting
 
 run/
 
+src/main/generated/.cache/
+
 AGENTS.md
 
 !gradle-wrapper.jar

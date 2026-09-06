@@ -1,7 +1,5 @@
 # G.L.A.S.S: Remastered
 
-
-
 ## Sodium support
 
 G.L.A.S.S: Remastered supports Sodium. For development, run `./gradlew runClient -Pwith_sodium` to include Sodium
